@@ -42,11 +42,11 @@ app.post('/api/storage', (req, res) => {
 });
 
 // --- FRONTEND AUSLIEFERN ---
-app.use(express.static(path.join(__dirname, '../dist')));
+//app.use(express.static(path.join(__dirname, '../dist')));
 
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
-});
+//app.get('*', (req, res) => {
+  //  res.sendFile(path.join(__dirname, '../dist/index.html'));
+//});
 
 // SERVER START
 app.listen(PORT, () => {
