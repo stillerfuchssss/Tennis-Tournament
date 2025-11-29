@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 
 import {
 
@@ -59,7 +59,7 @@ return Date.now().toString(36) + Math.random().toString(36).substr(2);
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// Passwort-Hashing (SHA-256 über Web Crypto API)
+// Passwort-Hashing (SHA-256 Ã¼ber Web Crypto API)
 
 const hashPassword = async (password: string): Promise<string> => {
 
@@ -83,6 +83,40 @@ return hashHex;
 
 
 
+// --- KONSTANTEN ---
+
+type Level = 'A' | 'B' | 'C';
+type AgeGroup = 'Red' | 'Orange' | 'Green' | 'Yellow';
+type ScoringMode = 'sets' | 'race4' | 'race10' | 'race15';
+
+const LEVEL_LABELS: Record<Level, string> = {
+  A: 'A - Turniererfahren',
+  B: 'B - Mittelstufe',
+  C: 'C - Einsteiger'
+};
+
+const AGE_GROUP_ORDER: AgeGroup[] = ['Red', 'Orange', 'Green', 'Yellow'];
+const AGE_GROUP_RULES: { id: AgeGroup; fromYear: number; toYear?: number; description: string }[] = [
+  { id: 'Red', fromYear: 2017, description: '2017 und juenger' },
+  { id: 'Orange', fromYear: 2016, toYear: 2016, description: '2016 und juenger' },
+  { id: 'Green', fromYear: 2014, toYear: 2015, description: '2014 und juenger' },
+  { id: 'Yellow', fromYear: 2011, toYear: 2013, description: '2013 bis 2011' },
+];
+const AGE_STAGE_LABELS: Record<AgeGroup, string> = {
+  Red: 'Kleinfeld',
+  Orange: 'Midcourt',
+  Green: 'Bambini',
+  Yellow: 'Grossfeld'
+};
+
+const formatAgeGroupLabel = (ageGroup: AgeGroup) => {
+  const rule = AGE_GROUP_RULES.find(r => r.id === ageGroup);
+  const stage = AGE_STAGE_LABELS[ageGroup] ? ` - ${AGE_STAGE_LABELS[ageGroup]}` : '';
+  return rule ? `${ageGroup} (${rule.description})${stage}` : `${ageGroup}${stage}`;
+};
+const AGE_RANK: Record<AgeGroup, number> = { Red: 0, Orange: 1, Green: 2, Yellow: 3 };
+
+
 // --- TYPEN ---
 
 type Player = {
@@ -93,7 +127,10 @@ name: string;
 
 birthDate: string;
 
-level?: string;
+level?: Level;
+manualAgeGroup?: AgeGroup;
+club?: string;
+email?: string;
 
 isTestData?: boolean;
 
@@ -126,7 +163,9 @@ name: string;
 
 birthDate: string;
 
-level?: string;
+level?: Level;
+club?: string;
+email?: string;
 
 desiredTournamentId?: string;
 
@@ -188,6 +227,7 @@ type GroupPlayer = {
     id: string;
     name: string;
     ageGroup: string;
+    level?: Level;
 };
 
 
@@ -209,6 +249,7 @@ isWin: boolean;
 isCloseLoss: boolean;
 
 timestamp: number;
+scoringMode?: ScoringMode;
 
 };
 
@@ -267,6 +308,7 @@ groups?: Group[];
 ageGroup: string;
 
 tournamentId: string;
+level?: Level;
 
 };
 
@@ -347,6 +389,10 @@ const [activeTab, setActiveTab] = useState<'ranking' | 'register' | 'players' | 
 const [viewingPlayer, setViewingPlayer] = useState<Player | null>(null);
 
 const [showPointsInfo, setShowPointsInfo] = useState(false);
+const [editPlayerLevel, setEditPlayerLevel] = useState<Level>('C');
+const [editPlayerAgeGroup, setEditPlayerAgeGroup] = useState<AgeGroup | 'auto'>('auto');
+const [editPlayerClub, setEditPlayerClub] = useState('');
+const [editPlayerEmail, setEditPlayerEmail] = useState('');
 
 
 // Toasts & Dialogs
@@ -364,6 +410,7 @@ const [rankingScope, setRankingScope] = useState<string>('overall');
 const [rankingRoundScope, setRankingRoundScope] = useState<string>('all');
 
 const [rankingAgeGroup, setRankingAgeGroup] = useState<string>('All');
+const [rankingLevelFilter, setRankingLevelFilter] = useState<Level | 'All'>('All');
 
 const [rankingSearchQuery, setRankingSearchQuery] = useState('');
 
@@ -406,7 +453,9 @@ const [regName, setRegName] = useState('');
 
 const [regBirthDate, setRegBirthDate] = useState('');
 
-const [regLevel, setRegLevel] = useState('B');
+const [regLevel, setRegLevel] = useState<Level>('C');
+const [regClub, setRegClub] = useState('');
+const [regEmail, setRegEmail] = useState('');
 
 const [regTournamentId, setRegTournamentId] = useState('');
 
@@ -449,12 +498,15 @@ const [sets, setSets] = useState<{p1: string, p2: string}[]>([{p1: '', p2: ''}])
 const [matchAnalysis, setMatchAnalysis] = useState<{isWin: boolean, isCloseLoss: boolean, message: string} | null>(null);
 
 const [roundError, setRoundError] = useState(false);
+const [scoringMode, setScoringMode] = useState<ScoringMode>('race10');
+const selectedPlayerLevel = players.find(p => p.id === selectedPlayerId)?.level || null;
 
 
 
 // Bracket Inputs & View
 
-const [activeBracketAge, setActiveBracketAge] = useState<string>('U14'); // The tab currently viewed in Brackets
+const [activeBracketAge, setActiveBracketAge] = useState<AgeGroup>('Red'); // The tab currently viewed in Brackets
+const [activeBracketLevel, setActiveBracketLevel] = useState<Level>('C'); // Match only within level
 
 const [bracketSize, setBracketSize] = useState<number>(8);
 
@@ -481,7 +533,7 @@ const [generationStatus, setGenerationStatus] = useState('');
 // --- INITIAL LOAD ---
 useEffect(() => {
   const loadData = async () => {
-    // HIER ÄNDERN WIR WAS:
+    // HIER Ã„NDERN WIR WAS:
     
     // Wir laden alles parallel vom Server
     const [p, t, r, reg, bMap, a] = await Promise.all([
@@ -575,17 +627,21 @@ saveData(STORAGE_KEYS.BRACKETS, newBrackets);
 
 // Helper to update a specific bracket
 
-const updateSingleBracket = (ageGroup: string, bracketData: Bracket | null) => {
+const makeBracketKey = (ageGroup: string, level?: Level | null) => `${ageGroup}-${level || 'all'}`;
+
+const updateSingleBracket = (ageGroup: string, bracketData: Bracket | null, level?: Level) => {
 
 const newMap = { ...brackets };
+const key = makeBracketKey(ageGroup, level || bracketData?.level);
 
 if (bracketData) {
 
-newMap[ageGroup] = bracketData;
+newMap[key] = bracketData;
 
 } else {
 
-delete newMap[ageGroup];
+delete newMap[key];
+delete newMap[ageGroup]; // legacy key cleanup
 
 }
 
@@ -659,99 +715,71 @@ setRegSelectedRounds([]);
 
 }, [regTournamentId]);
 
-
-
-const calculateAgeGroup = (birthDateStr: string): string => {
-
-if (!birthDateStr) return "U?";
-
-const today = new Date();
-
-const birthDate = new Date(birthDateStr);
-
-let age = today.getFullYear() - birthDate.getFullYear();
-
-const m = today.getMonth() - birthDate.getMonth();
-
-if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+useEffect(() => {
+if (!viewingPlayer) return;
+setEditPlayerLevel(viewingPlayer.level || 'C');
+setEditPlayerAgeGroup(viewingPlayer.manualAgeGroup || 'auto');
+setEditPlayerClub(viewingPlayer.club || '');
+setEditPlayerEmail(viewingPlayer.email || '');
+}, [viewingPlayer]);
 
 
 
-if (age <= 10) return "U10";
+const calculateAgeGroup = (input: string | Player): AgeGroup => {
 
-if (age <= 12) return "U12";
+const manual = typeof input === 'string' ? undefined : input.manualAgeGroup;
+const birthDateStr = typeof input === 'string' ? input : input.birthDate;
+if (manual) return manual;
 
-if (age <= 14) return "U14";
+if (!birthDateStr) return "Yellow";
 
-if (age <= 16) return "U16";
+const year = new Date(birthDateStr).getFullYear();
+if (!Number.isFinite(year)) return "Yellow";
 
-if (age <= 18) return "U18";
+if (year >= 2017) return "Red";
+if (year === 2016) return "Orange";
+if (year >= 2014 && year <= 2015) return "Green";
 
-if (age <= 21) return "U21";
+// 2013 bis 2011 (und aelter) laufen in Yellow
+return "Yellow";
 
-return "Erw.";
+};
 
+const canPlayInAgeGroup = (player: Player, targetAge: AgeGroup) => {
+  const playerAge = calculateAgeGroup(player);
+  return AGE_RANK[playerAge] <= AGE_RANK[targetAge]; // juengere d�rfen nach oben, nicht umgekehrt
 };
 
 
 
 const getSortedAgeGroups = () => {
 
-const groups = new Set(players.map(p => calculateAgeGroup(p.birthDate)));
+const groups = new Set(players.map(p => calculateAgeGroup(p)));
+const validGroups = AGE_GROUP_ORDER.filter(g => groups.has(g));
 
-const order = ["U10", "U12", "U14", "U16", "U18", "U21", "Erw."];
+const present: (AgeGroup | 'All')[] = ["All", ...validGroups];
+AGE_GROUP_ORDER.forEach(d => { if(!present.includes(d)) present.push(d) });
 
-// Default list if empty
-
-const defaults = ["U10", "U12", "U14", "U16", "U18", "Erw."];
-
-const present = ["All", ...order.filter(g => groups.has(g))];
-
-// Merge defaults if they are not present, just for the tabs
-
-defaults.forEach(d => { if(!present.includes(d)) present.push(d) });
-
-// Sort again
-
-return present.sort((a,b) => {
-
-if(a === 'All') return -1;
-
-if(b === 'All') return 1;
-
-const aVal = a === 'Erw.' ? 99 : parseInt(a.replace('U', ''));
-
-const bVal = b === 'Erw.' ? 99 : parseInt(b.replace('U', ''));
-
-return aVal - bVal;
-
-});
+return present;
 
 };
 
+const regPreviewAge = regBirthDate ? formatAgeGroupLabel(calculateAgeGroup(regBirthDate)) : 'wird automatisch zugewiesen';
+const displayAgeGroup = (g: AgeGroup | 'All') => g === 'All' ? 'Alle Altersklassen' : formatAgeGroupLabel(g);
 
 
-const getGroupSizeWeight = (participantCount: number) => {
+
+const getLargestGroupCount = (ageGroup: AgeGroup, level?: Level | null) => {
+const same = players.filter(p => calculateAgeGroup(p) === ageGroup && (!level || p.level === level));
+return Math.max(1, same.length);
+};
+
+const getGroupSizeWeight = (participantCount: number, ageGroup: AgeGroup, level?: Level | null) => {
 
 if (participantCount <= 0) return 1;
 
-
-// ANGEPASSTE GEWICHTUNG
-
-// Ab 8 Spielern: Faktor 1.0
-
-// Weniger als 8: +0.05 pro fehlendem Spieler
-
-if (participantCount >= 8) return 1;
-
-
-const diff = 8 - participantCount;
-
-// z.B. 4 Spieler: 8-4=4 -> 4*0.05 = 0.2 -> Faktor 1.2
-
-// z.B. 2 Spieler: 8-2=6 -> 6*0.05 = 0.3 -> Faktor 1.3
-
-const weight = 1 + (diff * 0.05);
+const maxGroup = getLargestGroupCount(ageGroup, level);
+const weight = Math.max(1, maxGroup / participantCount);
 
 return parseFloat(weight.toFixed(2));
 
@@ -765,7 +793,7 @@ const handleCreateTeam = () => {
 
 if (!teamMember1 || !teamMember2 || teamMember1 === teamMember2) {
 
-addToast("Bitte zwei unterschiedliche Spieler wählen", "error");
+addToast("Bitte zwei unterschiedliche Spieler wÃ¤hlen", "error");
 
 return;
 
@@ -813,12 +841,16 @@ addToast(`Doppel-Team "${teamName}" erstellt`);
 
 // --- TOURNAMENT TOOLS LOGIC (Bracket & Groups) ---
 
+const activeBracketKey = makeBracketKey(activeBracketAge, activeBracketLevel);
+const activeBracket = brackets[activeBracketKey] || brackets[activeBracketAge];
+
 
 // Generates Bracket for CURRENTLY SELECTED tab (activeBracketAge)
 
 const generateBracket = (randomize: boolean, playerList?: Player[]) => {
 
 const targetAge = playerList ? activeBracketAge : activeBracketAge; // Simplification, usually same
+const targetLevel = activeBracketLevel;
 
 
 let selectedPlayers: (Player | null)[] = [];
@@ -846,13 +878,25 @@ if (count > 32) targetSize = 64;
 
 selectedPlayers = [...playerList];
 
+selectedPlayers = selectedPlayers.filter((p): p is Player => p !== null && p.level === targetLevel);
+
+if (selectedPlayers.length === 0) {
+addToast("Keine Spieler in dieser Leistungsklasse f\u00fcr die KO-Phase", "error");
+return;
+}
+
 if (randomize) selectedPlayers.sort(() => 0.5 - Math.random());
 
 } else {
 
 // Standard Generation
 
-const candidates = players.filter(p => calculateAgeGroup(p.birthDate) === targetAge);
+const candidates = players.filter(p => canPlayInAgeGroup(p, targetAge) && p.level === targetLevel);
+
+if (candidates.length === 0) {
+addToast("Keine Spieler f\u00fcr diese Alters- und Leistungsklasse", "error");
+return;
+}
 
 if (randomize) {
 
@@ -931,9 +975,10 @@ rounds,
 
 ageGroup: targetAge,
 
-tournamentId: 'ko-stage-' + generateId()
+tournamentId: 'ko-stage-' + generateId(),
+level: targetLevel
 
-});
+}, targetLevel);
 
 addToast(`Turnierbaum (${targetAge}) erstellt`);
 
@@ -943,9 +988,14 @@ addToast(`Turnierbaum (${targetAge}) erstellt`);
 
 const generateGroups = () => {
 
-const candidates = players.filter(p => calculateAgeGroup(p.birthDate) === activeBracketAge);
+const candidates = players.filter(p => canPlayInAgeGroup(p, activeBracketAge) && p.level === activeBracketLevel);
 
 const shuffled = [...candidates].sort(() => 0.5 - Math.random());
+
+if (shuffled.length === 0) {
+addToast("Keine passenden Spieler f\u00fcr diese Alters- und Leistungsklasse", "error");
+return;
+}
 
 
 const numGroups = Math.ceil(shuffled.length / groupSizeInput);
@@ -1014,9 +1064,10 @@ groups: groups,
 
 ageGroup: activeBracketAge,
 
-tournamentId: 'group-stage-' + generateId()
+tournamentId: 'group-stage-' + generateId(),
+level: activeBracketLevel
 
-});
+}, activeBracketLevel);
 
 addToast(`Gruppenphase (${activeBracketAge}) erstellt`);
 
@@ -1026,7 +1077,7 @@ addToast(`Gruppenphase (${activeBracketAge}) erstellt`);
 
 const fillRandomGroupResults = () => {
 
-const currentBracket = brackets[activeBracketAge];
+const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.groups) return;
 
@@ -1071,7 +1122,7 @@ return { ...m, score, winner };
 }));
 
 
-updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups });
+updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups }, activeBracketLevel);
 
 addToast("Zufallsergebnisse eingetragen");
 
@@ -1081,11 +1132,11 @@ addToast("Zufallsergebnisse eingetragen");
 
 const clearGroupResults = () => {
 
-const currentBracket = brackets[activeBracketAge];
+const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.groups) return;
 
-if (!confirm("Alle Gruppenergebnisse löschen?")) return;
+if (!confirm("Alle Gruppenergebnisse lÃ¶schen?")) return;
 
 
 const newGroups = currentBracket.groups.map(g => ({
@@ -1096,9 +1147,9 @@ matches: g.matches.map(m => ({ ...m, score: '', winner: null }))
 
 }));
 
-updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups });
+updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups }, activeBracketLevel);
 
-addToast("Ergebnisse gelöscht");
+addToast("Ergebnisse gelÃ¶scht");
 
 };
 
@@ -1209,11 +1260,11 @@ return p || null;
 
 const advanceGroupsToKO = () => {
 
-const currentBracket = brackets[activeBracketAge];
+const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.groups) {
 
-addToast("Keine Gruppenphase für diese Altersklasse vorhanden", "error");
+addToast("Keine Gruppenphase fÃ¼r diese Altersklasse vorhanden", "error");
 
 return;
 
@@ -1225,7 +1276,7 @@ return;
 
 triggerConfirm(
 
-"KO-Phase aus den aktuellen Tabellenständen generieren? Die Gruppenansicht wird überschrieben.",
+"KO-Phase aus den aktuellen TabellenstÃ¤nden generieren? Die Gruppenansicht wird Ã¼berschrieben.",
 
 () => {
 
@@ -1279,9 +1330,9 @@ qualifiers.push(p1, p2);
 
 
 
-// Falls noch zweite übrig sind (z.B. Gruppen mit nur 1 Qualifizierten),
+// Falls noch zweite Ã¼brig sind (z.B. Gruppen mit nur 1 Qualifizierten),
 
-// hängen wir sie hinten dran -> ggf. Freilos im Baum.
+// hÃ¤ngen wir sie hinten dran -> ggf. Freilos im Baum.
 
 seconds.forEach(sec => {
 
@@ -1303,7 +1354,7 @@ if (p) qualifiers.push(p);
 
 if (qualifiers.length < 2) {
 
-addToast("Zu wenige Spieler für eine KO-Phase", "error");
+addToast("Zu wenige Spieler fÃ¼r eine KO-Phase", "error");
 
 closeConfirm();
 
@@ -1335,7 +1386,7 @@ closeConfirm();
 
 const updateGroupMatch = (groupIndex: number, matchIndex: number, score: string) => {
 
-const currentBracket = brackets[activeBracketAge];
+const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.groups) return;
 
@@ -1363,7 +1414,7 @@ newGroups[groupIndex].matches[matchIndex] = match;
 
 
 
-updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups });
+updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups }, activeBracketLevel);
 
 };
 
@@ -1371,7 +1422,7 @@ updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups });
 
 const advanceBracket = (roundIndex: number, matchIndex: number, winner: Player) => {
 
-const currentBracket = brackets[activeBracketAge];
+const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.rounds) return;
 
@@ -1394,7 +1445,7 @@ else newRounds[nextRoundIndex][nextMatchIndex].p2 = winner;
 
 }
 
-updateSingleBracket(activeBracketAge, { ...currentBracket, rounds: newRounds });
+updateSingleBracket(activeBracketAge, { ...currentBracket, rounds: newRounds }, activeBracketLevel);
 
 };
 
@@ -1402,7 +1453,7 @@ updateSingleBracket(activeBracketAge, { ...currentBracket, rounds: newRounds });
 
 const setBracketPlayer = (roundIndex: number, matchIndex: number, slot: 'p1' | 'p2', playerId: string) => {
 
-const currentBracket = brackets[activeBracketAge];
+const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.rounds) return;
 
@@ -1412,7 +1463,7 @@ const newRounds = [...currentBracket.rounds];
 
 newRounds[roundIndex][matchIndex][slot] = player;
 
-updateSingleBracket(activeBracketAge, { ...currentBracket, rounds: newRounds });
+updateSingleBracket(activeBracketAge, { ...currentBracket, rounds: newRounds }, activeBracketLevel);
 
 };
 
@@ -1434,13 +1485,35 @@ return `${p2}:${p1}`;
 
 
 
-const analyzeSingleScore = (scoreStr: string) => {
+const analyzeSingleScore = (scoreStr: string, mode: ScoringMode = 'sets') => {
 
 const cleanScore = scoreStr.replace(/[,;]/g, ' ').replace(/\s+/g, ' ').trim();
 
 if (!cleanScore) return { isWin: false, isCloseLoss: false };
 
 const sets = cleanScore.split(' ');
+
+// Punktemodi (race) werden als Einzel-Set interpretiert
+if (mode !== 'sets') {
+  const [first] = sets;
+  const [aStr, bStr] = (first || '').split(/[:\-]/);
+  const p1 = parseInt(aStr);
+  const p2 = parseInt(bStr);
+  if (isNaN(p1) || isNaN(p2)) return { isWin: false, isCloseLoss: false };
+  const isWin = p1 > p2;
+  const diff = Math.abs(p1 - p2);
+  let isCloseLoss = false;
+  if (!isWin) {
+    if (mode === 'race10') {
+      isCloseLoss = (p2 >= 10 && p1 >= 9 && diff === 1);
+    } else if (mode === 'race15') {
+      isCloseLoss = (p2 >= 15 && p1 >= 12 && diff <= 3);
+    } else {
+      isCloseLoss = false; // race4 keine knappen Niederlagen
+    }
+  }
+  return { isWin, isCloseLoss };
+}
 
 let setsWon = 0;
 
@@ -1542,13 +1615,13 @@ return;
 
 }
 
-const result = analyzeSingleScore(scoreStr);
+const result = analyzeSingleScore(scoreStr, scoringMode);
 
 let message = result.isWin ? "Sieg (+2)" : result.isCloseLoss ? "Knapp (+1)" : "Teilnahme (+0)";
 
 setMatchAnalysis({ ...result, message });
 
-}, [sets]);
+}, [sets, scoringMode]);
 
 
 
@@ -1656,7 +1729,7 @@ addToast('Admin Account erstellt');
 
 const handleDeleteAdmin = (id: string) => {
 
-if (!confirm("Diesen Admin Account löschen?")) return;
+if (!confirm("Diesen Admin Account lÃ¶schen?")) return;
 
 updateAdmins(admins.filter(a => a.id !== id));
 
@@ -1672,13 +1745,16 @@ const handleRegistration = () => {
 
 if (!regName || !regBirthDate) {
 
-addToast('Bitte Name und Datum ausfüllen', 'error');
+addToast('Bitte Name und Datum ausfuellen', 'error');
 
 return;
 
 }
 
-const data = {
+const trimmedClub = regClub.trim();
+const trimmedEmail = regEmail.trim();
+
+const data: RegistrationRequest = {
 
 id: generateId(),
 
@@ -1687,6 +1763,8 @@ name: regName,
 birthDate: regBirthDate,
 
 level: regLevel,
+club: trimmedClub || undefined,
+email: trimmedEmail || undefined,
 
 desiredTournamentId: regTournamentId,
 
@@ -1696,13 +1774,11 @@ timestamp: Date.now()
 
 };
 
-
-
 if (isAdmin) {
 
-updatePlayers([...players, { id: generateId(), name: regName, birthDate: regBirthDate, level: regLevel }]);
+updatePlayers([...players, { id: generateId(), name: regName, birthDate: regBirthDate, level: regLevel, club: trimmedClub || undefined, email: trimmedEmail || undefined }]);
 
-addToast('Spieler hinzugefügt');
+addToast('Spieler hinzugefuegt');
 
 } else {
 
@@ -1716,15 +1792,13 @@ addToast('Anmeldung gesendet');
 
 }
 
-setRegName(''); setRegBirthDate(''); setRegTournamentId(''); setRegSelectedRounds([]);
+setRegName(''); setRegBirthDate(''); setRegTournamentId(''); setRegSelectedRounds([]); setRegLevel('C'); setRegClub(''); setRegEmail('');
 
 };
 
-
-
 const approveRegistration = (req: RegistrationRequest) => {
 
-updatePlayers([...players, { id: generateId(), name: req.name, birthDate: req.birthDate, level: req.level }]);
+updatePlayers([...players, { id: generateId(), name: req.name, birthDate: req.birthDate, level: req.level, club: req.club, email: req.email }]);
 
 updateRegistrations(pendingRegistrations.filter(r => r.id !== req.id));
 
@@ -1752,7 +1826,7 @@ closeConfirm();
 
 const deletePlayer = (id: string) => {
 
-triggerConfirm("Spieler und ALLE seine Ergebnisse löschen?", () => {
+triggerConfirm("Spieler und ALLE seine Ergebnisse lÃ¶schen?", () => {
 
 updatePlayers(players.filter(p => p.id !== id));
 
@@ -1760,7 +1834,7 @@ const cleanResults = results.filter(r => r.playerId !== id);
 
 updateResults(cleanResults);
 
-addToast('Spieler gelöscht', 'info');
+addToast('Spieler gelÃ¶scht', 'info');
 
 closeConfirm();
 
@@ -1903,7 +1977,7 @@ updateTournaments(updatedTournaments);
 
 setNewRoundName(''); setNewRoundDate(''); setAddingRoundToTournamentId(null);
 
-addToast('Spieltag hinzugefügt');
+addToast('Spieltag hinzugefÃ¼gt');
 
 };
 
@@ -1911,7 +1985,7 @@ addToast('Spieltag hinzugefügt');
 
 const deleteRound = (tournamentId: string, roundId: string) => {
 
-triggerConfirm("Spieltag wirklich löschen?", () => {
+triggerConfirm("Spieltag wirklich lÃ¶schen?", () => {
 
 const updatedTournaments = tournaments.map(t => {
 
@@ -1927,7 +2001,7 @@ return t;
 
 updateTournaments(updatedTournaments);
 
-addToast('Spieltag gelöscht', 'info');
+addToast('Spieltag gelÃ¶scht', 'info');
 
 closeConfirm();
 
@@ -1942,7 +2016,7 @@ const deleteTournament = (id: string) => {
 if (!isAdmin) return;
 
 
-triggerConfirm("Turnier und ALLE Ergebnisse endgültig löschen?", () => {
+triggerConfirm("Turnier und ALLE Ergebnisse endgÃ¼ltig lÃ¶schen?", () => {
 
 const newResults = results.filter(r => r.tournamentId !== id);
 
@@ -1954,7 +2028,7 @@ updateTournaments(newTournaments);
 
 if (selectedTournamentId === id) setSelectedTournamentId('');
 
-addToast('Turnier gelöscht', 'info');
+addToast('Turnier gelÃ¶scht', 'info');
 
 closeConfirm();
 
@@ -1978,6 +2052,17 @@ const player1 = players.find(p => p.id === selectedPlayerId);
 
 const player2 = players.find(p => p.id === selectedOpponentId);
 
+if (player1 && player2) {
+  if (player1.level && player2.level && player1.level !== player2.level) {
+    addToast('Nur identische Leistungsklassen d\u00fcrfen gegeneinander spielen', 'error');
+    return;
+  }
+  if ((player1.level && !player2.level) || (!player1.level && player2.level)) {
+    addToast('Bitte beiden Spielern dieselbe Leistungsklasse zuweisen, bevor ein Match erfasst wird', 'error');
+    return;
+  }
+}
+
 const scoreStr = sets.map(s => `${s.p1}:${s.p2}`).join(' ');
 
 const timestamp = Date.now();
@@ -1992,14 +2077,14 @@ id: matchId, roundId: selectedRoundId, opponentId: selectedOpponentId,
 
 opponentName: player2 ? player2.name : 'Unbekannt', score: scoreStr,
 
-isWin: matchAnalysis.isWin, isCloseLoss: matchAnalysis.isCloseLoss, timestamp
+isWin: matchAnalysis.isWin, isCloseLoss: matchAnalysis.isCloseLoss, timestamp, scoringMode
 
 };
 
 
 const reversedScore = reverseScoreString(scoreStr);
 
-const resultP2 = analyzeSingleScore(reversedScore);
+const resultP2 = analyzeSingleScore(reversedScore, scoringMode);
 
 const matchP2: MatchRecord = {
 
@@ -2007,7 +2092,7 @@ id: matchId, roundId: selectedRoundId, opponentId: selectedPlayerId,
 
 opponentName: player1 ? player1.name : 'Unbekannt', score: reversedScore,
 
-isWin: resultP2.isWin, isCloseLoss: resultP2.isCloseLoss, timestamp
+isWin: resultP2.isWin, isCloseLoss: resultP2.isCloseLoss, timestamp, scoringMode
 
 };
 
@@ -2121,27 +2206,21 @@ newTournaments.push(testTourn);
 
 
 
-// 2. Spieler - Angepasste Jahre für 2025
+// 2. Spieler - Angepasste Jahre fÃ¼r 2025
 
 const ageTemplates = [
 
-{ label: "U10", year: 2016 },
+{ label: "Red", year: 2018 },
 
-{ label: "U12", year: 2014 },
+{ label: "Orange", year: 2016 },
 
-{ label: "U14", year: 2012 },
+{ label: "Green", year: 2014 },
 
-{ label: "U16", year: 2010 },
-
-{ label: "U18", year: 2008 },
-
-{ label: "U21", year: 2005 },
-
-{ label: "Erw.", year: 1995 },
+{ label: "Yellow", year: 2012 },
 
 ];
 
-const levels = ["A", "B", "C"];
+const levels: Level[] = ["A", "B", "C"];
 
 const createdPlayers: GroupPlayer[] = [];
 
@@ -2149,7 +2228,7 @@ const createdPlayers: GroupPlayer[] = [];
 
 const existingTestPlayers = newPlayers.filter(p => p.isTestData).map(p => ({
 
-id: p.id, name: p.name, ageGroup: calculateAgeGroup(p.birthDate)
+id: p.id, name: p.name, ageGroup: calculateAgeGroup(p), level: p.level
 
 }));
 
@@ -2194,7 +2273,7 @@ isTestData: true
 
 newPlayers.push(newP);
 
-createdPlayers.push({ id: newP.id, name: newP.name, ageGroup: tpl.label });
+createdPlayers.push({ id: newP.id, name: newP.name, ageGroup: tpl.label, level: newP.level });
 
 newPlayerCount++;
 
@@ -2215,9 +2294,11 @@ const groups: Record<string, GroupPlayer[]> = {};
 
 createdPlayers.forEach(p => {
 
-if (!groups[p.ageGroup]) groups[p.ageGroup] = [];
+const key = `${p.ageGroup}-${p.level || 'X'}`;
 
-groups[p.ageGroup].push(p);
+if (!groups[key]) groups[key] = [];
+
+groups[key].push(p);
 
 });
 
@@ -2381,7 +2462,7 @@ const deleteTestData = () => {
 if (!isAdmin) return;
 
 
-triggerConfirm("Wirklich alle Testdaten löschen?", () => {
+triggerConfirm("Wirklich alle Testdaten lÃ¶schen?", () => {
 
 const cleanPlayers = players.filter(p => !p.isTestData);
 
@@ -2398,7 +2479,7 @@ updateTournaments(cleanTournaments);
 updateResults(cleanResults);
 
 
-addToast('Testdaten vollständig bereinigt', 'success');
+addToast('Testdaten vollstÃ¤ndig bereinigt', 'success');
 
 closeConfirm();
 
@@ -2416,11 +2497,11 @@ let data = players.map(player => {
 
 let totalPoints = 0;
 
-let hasPlayedInScope = false; // Flag für Teilnahme
+let hasPlayedInScope = false; // Flag fÃ¼r Teilnahme
 
 const details: any[] = [];
 
-const ageGroup = calculateAgeGroup(player.birthDate);
+const ageGroup = calculateAgeGroup(player);
 
 
 
@@ -2464,7 +2545,7 @@ if (matchesInRound.length === 0) return;
 
 
 
-// Teilnahme bestätigt (hat Matches in einer Runde dieses Turniers)
+// Teilnahme bestÃ¤tigt (hat Matches in einer Runde dieses Turniers)
 
 hasPlayedInScope = true;
 
@@ -2472,7 +2553,7 @@ hasPlayedInScope = true;
 
 const roundParticipants = players.filter(p => {
 
-if (calculateAgeGroup(p.birthDate) !== ageGroup) return false;
+if (calculateAgeGroup(p) !== ageGroup) return false;
 
 const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
 
@@ -2482,7 +2563,7 @@ return r?.matches.some(m => m.roundId === round.id);
 
 
 
-const roundWeight = getGroupSizeWeight(roundParticipants);
+const roundWeight = getGroupSizeWeight(roundParticipants, ageGroup as AgeGroup, player.level);
 
 
 
@@ -2510,9 +2591,9 @@ if(matchesNoRound.length > 0) {
 
 hasPlayedInScope = true; // Hat Matches ohne Runde
 
-const totalP = players.filter(p => calculateAgeGroup(p.birthDate) === ageGroup && results.find(r => r.playerId === p.id && r.tournamentId === tourn.id)).length;
+const totalP = players.filter(p => calculateAgeGroup(p) === ageGroup && results.find(r => r.playerId === p.id && r.tournamentId === tourn.id)).length;
 
-const w = getGroupSizeWeight(totalP);
+const w = getGroupSizeWeight(totalP, ageGroup as AgeGroup, player.level);
 
 matchesNoRound.forEach(m => {
 
@@ -2536,7 +2617,7 @@ if (totalMatches > 0) {
 
 const uniqueTournParticipants = players.filter(p => {
 
-if (calculateAgeGroup(p.birthDate) !== ageGroup) return false;
+if (calculateAgeGroup(p) !== ageGroup) return false;
 
 const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
 
@@ -2544,9 +2625,9 @@ return r && r.matches.length > 0;
 
 }).length;
 
-const tournWeight = getGroupSizeWeight(uniqueTournParticipants);
+const tournWeight = getGroupSizeWeight(uniqueTournParticipants, ageGroup as AgeGroup, player.level);
 
-aggregatedPoints += (1 * tournWeight);
+aggregatedPoints += 1; // Teilnahme ungewichtet
 
 totalPoints += aggregatedPoints;
 
@@ -2587,11 +2668,11 @@ rankingRoundScope === 'all' || m.roundId === rankingRoundScope
 
 if (matchesInScope.length > 0) {
 
-hasPlayedInScope = true; // Hat Matches im gewählten Filter
+hasPlayedInScope = true; // Hat Matches im gewÃ¤hlten Filter
 
 } else {
 
-return; // Keine Matches im Scope -> weiter zum nächsten Turnier
+return; // Keine Matches im Scope -> weiter zum nÃ¤chsten Turnier
 
 }
 
@@ -2599,7 +2680,7 @@ return; // Keine Matches im Scope -> weiter zum nächsten Turnier
 
 const participantCount = players.filter(p => {
 
-const pAgeGroup = calculateAgeGroup(p.birthDate);
+const pAgeGroup = calculateAgeGroup(p);
 
 if (pAgeGroup !== ageGroup) return false;
 
@@ -2613,7 +2694,7 @@ return r.matches.some(m => rankingRoundScope === 'all' || m.roundId === rankingR
 
 
 
-const groupWeight = getGroupSizeWeight(participantCount);
+const groupWeight = getGroupSizeWeight(participantCount, ageGroup as AgeGroup, player.level);
 
 let matchPoints = 0;
 
@@ -2635,7 +2716,7 @@ if (m.isWin) wins++; else if (m.isCloseLoss) closeLosses++;
 
 
 
-const participationPoints = 1 * groupWeight;
+const participationPoints = 1; // Teilnahme ungewichtet
 
 const turnierScore = participationPoints + matchPoints;
 
@@ -2674,7 +2755,7 @@ return {
 
 })
 
-// FILTER: Nur Spieler anzeigen, die im Scope gespielt haben (außer bei Gesamtansicht, da zeigen wir alle mit Punkten > 0 oder wenn sie überhaupt mal gespielt haben)
+// FILTER: Nur Spieler anzeigen, die im Scope gespielt haben (auÃŸer bei Gesamtansicht, da zeigen wir alle mit Punkten > 0 oder wenn sie Ã¼berhaupt mal gespielt haben)
 
 .filter(p => {
 
@@ -2700,6 +2781,10 @@ data = data.filter(p => p.ageGroup === rankingAgeGroup);
 
 }
 
+if (rankingLevelFilter !== 'All') {
+data = data.filter(p => p.level === rankingLevelFilter);
+}
+
 
 if (rankingSearchQuery) {
 
@@ -2711,7 +2796,7 @@ data = data.filter(p => p.name.toLowerCase().includes(rankingSearchQuery.toLower
 
 return data.sort((a, b) => b.totalPoints - a.totalPoints);
 
-}, [players, results, tournaments, rankingScope, rankingAgeGroup, rankingRoundScope, rankingSearchQuery]);
+}, [players, results, tournaments, rankingScope, rankingAgeGroup, rankingLevelFilter, rankingRoundScope, rankingSearchQuery]);
 
 
 
@@ -2735,7 +2820,7 @@ return players
 
 .filter(p => !playersListSearch || p.name.toLowerCase().includes(playersListSearch.toLowerCase()))
 
-.filter(p => playersListAgeFilter === 'All' || calculateAgeGroup(p.birthDate) === playersListAgeFilter)
+.filter(p => playersListAgeFilter === 'All' || calculateAgeGroup(p) === playersListAgeFilter)
 
 .sort((a,b) => a.name.localeCompare(b.name));
 
@@ -2819,6 +2904,21 @@ setEditingMatchId(null);
 
 };
 
+const savePlayerMeta = () => {
+
+const manualAge = editPlayerAgeGroup === 'auto' ? undefined : editPlayerAgeGroup;
+const cleanedClub = editPlayerClub.trim();
+const cleanedEmail = editPlayerEmail.trim();
+
+const updated = players.map(p => p.id === viewingPlayer.id ? { ...p, level: editPlayerLevel, manualAgeGroup: manualAge, club: cleanedClub || undefined, email: cleanedEmail || undefined } : p);
+
+updatePlayers(updated);
+const refreshed = updated.find(p => p.id === viewingPlayer.id) || null;
+setViewingPlayer(refreshed);
+addToast('Spieler aktualisiert');
+
+};
+
 
 
 // H2H Logic
@@ -2863,11 +2963,11 @@ return (
 
 <div className="flex gap-2 mt-2 text-slate-300 text-sm">
 
-<span>{calculateAgeGroup(viewingPlayer.birthDate)}</span>
+<span>{formatAgeGroupLabel(calculateAgeGroup(viewingPlayer))}</span>
 
-<span>•</span>
+<span>â€¢</span>
 
-<span>Level {viewingPlayer.level || '-'}</span>
+<span>Level {viewingPlayer.level ? LEVEL_LABELS[viewingPlayer.level] : '-'}</span>
 
 </div>
 
@@ -2891,6 +2991,74 @@ return (
 
 
 <div className="p-6">
+
+{isAdmin && (
+
+<div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 mb-4">
+
+<div className="grid md:grid-cols-2 gap-3">
+
+<div>
+
+<label className="text-xs font-bold text-slate-600 uppercase block mb-1">Leistungsklasse</label>
+
+<select value={editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value as Level)} className="w-full p-2 border rounded bg-white text-sm">
+
+<option value="A">{LEVEL_LABELS.A}</option>
+
+<option value="B">{LEVEL_LABELS.B}</option>
+
+<option value="C">{LEVEL_LABELS.C}</option>
+
+</select>
+
+</div>
+
+<div>
+
+<label className="text-xs font-bold text-slate-600 uppercase block mb-1">Altersklasse (manuell)</label>
+
+<select value={editPlayerAgeGroup} onChange={e => setEditPlayerAgeGroup(e.target.value as AgeGroup | 'auto')} className="w-full p-2 border rounded bg-white text-sm">
+
+<option value="auto">Automatisch ({formatAgeGroupLabel(calculateAgeGroup(viewingPlayer.birthDate))})</option>
+
+{AGE_GROUP_ORDER.map(g => (
+
+<option key={g} value={g}>{formatAgeGroupLabel(g)}</option>
+
+))}
+
+</select>
+
+</div>
+
+<div>
+
+<label className="text-xs font-bold text-slate-600 uppercase block mb-1">Verein</label>
+
+<input type="text" value={editPlayerClub} onChange={e => setEditPlayerClub(e.target.value)} className="w-full p-2 border rounded bg-white text-sm" placeholder="Optional eintragen"/>
+
+</div>
+
+<div>
+
+<label className="text-xs font-bold text-slate-600 uppercase block mb-1">E-Mail</label>
+
+<input type="email" value={editPlayerEmail} onChange={e => setEditPlayerEmail(e.target.value)} className="w-full p-2 border rounded bg-white text-sm" placeholder="Optional eintragen"/>
+
+</div>
+
+</div>
+
+<div className="flex justify-end mt-3">
+
+<button onClick={savePlayerMeta} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded">Speichern</button>
+
+</div>
+
+</div>
+
+)}
 
 {statsView === 'history' ? (
 
@@ -3089,7 +3257,7 @@ onChange={(e) => setH2hSearch(e.target.value)}
 
 <select className="w-full p-2 border rounded text-sm mb-4" value={h2hOpponentId} onChange={(e) => setH2hOpponentId(e.target.value)}>
 
-<option value="">-- Gegner wählen --</option>
+<option value="">-- Gegner wÃ¤hlen --</option>
 
 {h2hPlayers.map(p => (
 
@@ -3164,7 +3332,7 @@ return (
 
 <AlertCircle size={24}/>
 
-<h3 className="text-lg font-bold">Bestätigung</h3>
+<h3 className="text-lg font-bold">BestÃ¤tigung</h3>
 
 </div>
 
@@ -3174,7 +3342,7 @@ return (
 
 <button onClick={closeConfirm} className="px-4 py-2 text-slate-500 font-medium hover:bg-slate-100 rounded-lg">Abbrechen</button>
 
-<button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausführen</button>
+<button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausfÃ¼hren</button>
 
 </div>
 
@@ -3255,7 +3423,7 @@ Tennis Turnier Manager
 
 <p className="text-slate-400 text-xs mt-1 ml-11 flex items-center gap-2">
 
-{isAdmin ? <><ShieldCheck size={12} className="text-emerald-400"/> Admin: {currentUser}</> : '👁️ Zuschauer Modus'}
+{isAdmin ? <><ShieldCheck size={12} className="text-emerald-400"/> Admin: {currentUser}</> : 'ðŸ‘ï¸ Zuschauer Modus'}
 
 <span className="bg-white/20 px-2 py-0.5 rounded ml-2 flex items-center gap-1"><HardDrive size={10}/> Local Storage</span>
 
@@ -3309,7 +3477,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 <button onClick={() => setActiveTab('bracket')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'bracket' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
 
-<GitFork size={18} /> Turnier-Tools
+Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 </button>
 
@@ -3321,7 +3489,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 <button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
 
-<ClipboardList size={18} /> {isAdmin ? 'Spieler Hinzufügen' : 'Anmeldung'}
+<ClipboardList size={18} /> {isAdmin ? 'Spieler HinzufÃ¼gen' : 'Anmeldung'}
 
 </button>
 
@@ -3360,7 +3528,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 <div className="space-y-6 animate-in fade-in">
 
-<div className="flex flex-col md:flex-row gap-4 justify-between bg-slate-50 p-4 rounded-xl border border-slate-100 items-start md:items-center">
+<div className="flex flex-col xl:flex-row xl:flex-wrap gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 items-stretch xl:items-center">
 
 
 <div className="flex flex-col gap-2 w-full md:w-auto">
@@ -3371,7 +3539,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 <select value={rankingScope} onChange={(e) => setRankingScope(e.target.value)} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none w-full md:w-auto">
 
-<option value="overall">🏆 Gesamtwertung</option>
+<option value="overall">ðŸ† Gesamtwertung</option>
 
 <optgroup label="Einzelne Turniere">
 
@@ -3408,7 +3576,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 
 
-<div className="relative w-full md:w-64">
+<div className="relative w-full xl:w-80 xl:flex-1">
 
 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
 
@@ -3418,18 +3586,18 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 
 
-<div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide w-full md:w-auto">
-
+<div className="w-full xl:w-auto flex gap-2">
+<select value={rankingAgeGroup} onChange={e => setRankingAgeGroup(e.target.value)} className="flex-1 p-2 border rounded-lg bg-white text-sm">
 {getSortedAgeGroups().map(group => (
-
-<button key={group} onClick={() => setRankingAgeGroup(group)} className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition ${rankingAgeGroup === group ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'}`}>
-
-{group}
-
-</button>
-
+<option key={group} value={group}>{displayAgeGroup(group)}</option>
 ))}
-
+</select>
+<select value={rankingLevelFilter} onChange={e => setRankingLevelFilter(e.target.value as Level | 'All')} className="w-32 min-w-[8rem] p-2 border rounded-lg bg-white text-sm">
+<option value="All">Alle Level</option>
+<option value="A">{LEVEL_LABELS.A}</option>
+<option value="B">{LEVEL_LABELS.B}</option>
+<option value="C">{LEVEL_LABELS.C}</option>
+</select>
 </div>
 
 </div>
@@ -3461,7 +3629,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 <li><b>Teilnahme:</b> 1 Punkt (x Gruppengewicht)</li>
 
-<li><b>Gruppengewicht:</b> Baseline = 8 Spieler (Faktor 1.0). Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.5). Große Gruppen werden nicht bestraft (min 1.0).</li>
+<li><b>Gruppengewicht:</b> Baseline = 8 Spieler (Faktor 1.0). Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.5). GroÃŸe Gruppen werden nicht bestraft (min 1.0).</li>
 
 </ul>
 
@@ -3499,7 +3667,7 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 {paginatedData.length === 0 ? (
 
-<tr><td colSpan={5} className="p-8 text-center text-slate-400">Keine Spieler gefunden {rankingScope !== 'overall' ? 'für diesen Zeitraum' : ''}.</td></tr>
+<tr><td colSpan={5} className="p-8 text-center text-slate-400">Keine Spieler gefunden {rankingScope !== 'overall' ? 'fÃ¼r diesen Zeitraum' : ''}.</td></tr>
 
 ) : (
 
@@ -3543,7 +3711,7 @@ return (
 
 <div className="text-[10px] text-slate-400 mt-1">
 
-{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teilnahme • ` : ''}
+{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teilnahme â€¢ ` : ''}
 
 {player.details[0]?.stats}
 
@@ -3574,7 +3742,7 @@ return (
 
 <div className="text-xs text-slate-500">
 
-Seite {currentPage} von {Math.max(1, totalPages)} • {rankingData.length} Spieler
+Seite {currentPage} von {Math.max(1, totalPages)} â€¢ {rankingData.length} Spieler
 
 </div>
 
@@ -3604,59 +3772,49 @@ Seite {currentPage} von {Math.max(1, totalPages)} • {rankingData.length} Spiel
 
 <div className="animate-in fade-in space-y-4">
 
-{/* Age Group Tabs */}
-
-<div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide border-b border-slate-200">
-
-{getSortedAgeGroups().filter(g => g !== 'All').map(g => (
-
-<button
-
-key={g}
-
-onClick={() => setActiveBracketAge(g)}
-
-className={`px-4 py-2 rounded-t-lg font-bold text-sm whitespace-nowrap transition-colors
-
-${activeBracketAge === g ? 'bg-white text-emerald-600 border-t border-x border-slate-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}
-
-`}
-
->
-
-{g}
-
-</button>
-
-))}
-
-</div>
-
-
-
 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
 
 <div className="flex justify-between items-center mb-6">
 
 <h2 className="text-xl font-bold flex items-center gap-2">
 
-{brackets[activeBracketAge]?.type === 'group' ? <Table2 className="text-emerald-600"/> : <GitFork className="text-emerald-600"/>}
+{activeBracket?.type === 'group' ? <Table2 className="text-emerald-600"/> : <GitFork className="text-emerald-600"/>}
 
-{isAdmin ? 'Turnier-Tools' : `Turnier-Übersicht (${activeBracketAge})`}
+Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 </h2>
 
-{isAdmin && brackets[activeBracketAge] && (
+{isAdmin && activeBracket && (
 
-<button onClick={() => updateSingleBracket(activeBracketAge, null)} className="text-red-500 text-sm hover:underline">Aktuellen Plan löschen</button>
+<button onClick={() => updateSingleBracket(activeBracketAge, null, activeBracketLevel)} className="text-red-500 text-sm hover:underline">Aktuellen Plan lÃ¶schen</button>
 
 )}
 
 </div>
 
+<div className="grid md:grid-cols-2 gap-3 mb-4">
+<div>
+<label className="text-xs font-bold text-slate-500 uppercase block mb-1">Altersklasse</label>
+<select value={activeBracketAge} onChange={(e) => setActiveBracketAge(e.target.value as AgeGroup)} className="w-full p-2 border rounded bg-slate-50">
+{getSortedAgeGroups().filter(g => g !== "All").map(g => (
+<option key={g} value={g}>{displayAgeGroup(g)}</option>
+))}
+</select>
+</div>
+<div>
+<label className="text-xs font-bold text-slate-500 uppercase block mb-1">Leistungsklasse</label>
+<select value={activeBracketLevel} onChange={(e) => setActiveBracketLevel(e.target.value as Level)} className="w-full p-2 border rounded bg-slate-50">
+<option value="A">{LEVEL_LABELS.A}</option>
+<option value="B">{LEVEL_LABELS.B}</option>
+<option value="C">{LEVEL_LABELS.C}</option>
+</select>
+</div>
+</div>
+
+<p className="text-sm text-slate-600 mb-4">Turnier-Übersicht: alle Gruppen dieser Alters- und Leistungsklasse auf einer Seite. Gruppenspiele fließen in die Rangliste ein.</p>
 
 
-{!brackets[activeBracketAge] ? (
+{!activeBracket ? (
 
 isAdmin ? (
 
@@ -3676,12 +3834,27 @@ isAdmin ? (
 
 </div>
 
+<div>
+
+<label className="text-xs font-bold text-slate-500 uppercase block mb-1">Leistungsklasse</label>
+
+<select value={activeBracketLevel} onChange={(e) => setActiveBracketLevel(e.target.value as Level)} className="p-2 border rounded w-40 text-sm">
+
+<option value="A">{LEVEL_LABELS.A}</option>
+
+<option value="B">{LEVEL_LABELS.B}</option>
+
+<option value="C">{LEVEL_LABELS.C}</option>
+
+</select>
+
+</div>
 
 {bracketType === 'ko' ? (
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase block mb-1">Größe</label>
+<label className="text-xs font-bold text-slate-500 uppercase block mb-1">GrÃ¶ÃŸe</label>
 
 <select value={bracketSize} onChange={(e) => setBracketSize(parseInt(e.target.value))} className="p-2 border rounded w-32 text-sm">
 
@@ -3729,7 +3902,7 @@ isAdmin ? (
 
 <div className="text-center p-12 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
 
-Kein aktives Turnier für {activeBracketAge}.
+Kein aktives Turnier fÃ¼r {activeBracketAge}.
 
 </div>
 
@@ -3737,15 +3910,15 @@ Kein aktives Turnier für {activeBracketAge}.
 
 ) : (
 
-brackets[activeBracketAge].type === 'ko' && brackets[activeBracketAge].rounds ? (
+activeBracket.type === 'ko' && activeBracket.rounds ? (
 
 <div className="overflow-x-auto pb-4 custom-scrollbar">
 
 {/* DYNAMIC WIDTH BASED ON ROUNDS */}
 
-<div className="flex gap-8 md:gap-16 pb-4" style={{ minWidth: `${Math.max(600, brackets[activeBracketAge].rounds!.length * 220)}px` }}>
+<div className="flex gap-8 md:gap-16 pb-4" style={{ minWidth: `${Math.max(600, activeBracket.rounds!.length * 220)}px` }}>
 
-{brackets[activeBracketAge].rounds!.map((round, rIndex) => (
+{activeBracket.rounds!.map((round, rIndex) => (
 
 <div key={rIndex} className="flex flex-col justify-around flex-1 relative gap-8">
 
@@ -3787,7 +3960,7 @@ value=""
 
 <option value="">+ Spieler</option>
 
-{players.filter(p => calculateAgeGroup(p.birthDate) === activeBracketAge).map(p => (
+{players.filter(p => calculateAgeGroup(p) === activeBracketAge && p.level === activeBracketLevel).map(p => (
 
 <option key={p.id} value={p.id}>{p.name}</option>
 
@@ -3834,7 +4007,7 @@ value=""
 
 <option value="">+ Spieler</option>
 
-{players.filter(p => calculateAgeGroup(p.birthDate) === activeBracketAge).map(p => (
+{players.filter(p => calculateAgeGroup(p) === activeBracketAge && p.level === activeBracketLevel).map(p => (
 
 <option key={p.id} value={p.id}>{p.name}</option>
 
@@ -3856,7 +4029,7 @@ value=""
 
 {/* Lines (Visuals) */}
 
-{rIndex < brackets[activeBracketAge].rounds!.length - 1 && (
+{rIndex < activeBracket.rounds!.length - 1 && (
 
 <div className="absolute top-1/2 -right-8 w-8 h-[1px] bg-slate-300 z-0"></div>
 
@@ -3890,7 +4063,7 @@ value=""
 
 <div className="font-bold text-center px-2">
 
-{brackets[activeBracketAge].rounds![brackets[activeBracketAge].rounds!.length - 1][0]?.winner?.name || '?'}
+{activeBracket.rounds![activeBracket.rounds!.length - 1][0]?.winner?.name || '?'}
 
 </div>
 
@@ -3918,7 +4091,7 @@ value=""
 
 <button onClick={clearGroupResults} className="text-xs bg-red-50 px-3 py-1 rounded hover:bg-red-100 text-red-500 flex items-center gap-1">
 
-<Trash2 size={12}/> Ergebnisse löschen
+<Trash2 size={12}/> Ergebnisse lÃ¶schen
 
 </button>
 
@@ -3935,7 +4108,7 @@ value=""
 
 <div className="grid md:grid-cols-2 gap-6">
 
-{brackets[activeBracketAge].groups?.map((group, gIndex) => {
+{activeBracket.groups?.map((group, gIndex) => {
 
 const standings = calculateGroupStandings(group);
 
@@ -3962,7 +4135,7 @@ return (
 
 <th className="pb-1 text-center">S:N</th>
 
-<th className="pb-1 text-center">Sätze</th>
+<th className="pb-1 text-center">SÃ¤tze</th>
 
 <th className="pb-1 text-right">Pkt</th>
 
@@ -4079,7 +4252,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
 <option value="All">Alle Altersklassen</option>
 
-{getSortedAgeGroups().filter(g => g!=='All').map(g => <option key={g} value={g}>{g}</option>)}
+{getSortedAgeGroups().filter(g => g!=='All').map(g => <option key={g} value={g}>{displayAgeGroup(g)}</option>)}
 
 </select>
 
@@ -4125,7 +4298,7 @@ onChange={e => setTeamSearch1(e.target.value)}
 
 <select className="w-full p-2 border rounded" value={teamMember1} onChange={e => setTeamMember1(e.target.value)}>
 
-<option value="">Spieler 1 wählen</option>
+<option value="">Spieler 1 wÃ¤hlen</option>
 
 {players.filter(p => !p.isTeam).filter(p => !teamSearch1 || p.name.toLowerCase().includes(teamSearch1.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
 
@@ -4153,7 +4326,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <select className="w-full p-2 border rounded" value={teamMember2} onChange={e => setTeamMember2(e.target.value)}>
 
-<option value="">Spieler 2 wählen</option>
+<option value="">Spieler 2 wÃ¤hlen</option>
 
 {players.filter(p => !p.isTeam && p.id !== teamMember1).filter(p => !teamSearch2 || p.name.toLowerCase().includes(teamSearch2.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
 
@@ -4207,9 +4380,9 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 </td>
 
-<td className="p-4 text-sm text-slate-500">{calculateAgeGroup(p.birthDate)}</td>
+<td className="p-4 text-sm text-slate-500">{formatAgeGroupLabel(calculateAgeGroup(p))}</td>
 
-<td className="p-4 text-sm text-slate-500">{p.level || '-'}</td>
+<td className="p-4 text-sm text-slate-500">{p.level ? LEVEL_LABELS[p.level] : '-'}</td>
 
 <td className="p-4 text-xs">
 
@@ -4264,7 +4437,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 </div>
 
-<h2 className="text-2xl font-bold text-slate-800 mb-2">{isAdmin ? 'Spieler direkt hinzufügen' : 'Spieler Anmeldung'}</h2>
+<h2 className="text-2xl font-bold text-slate-800 mb-2">{isAdmin ? 'Spieler direkt hinzufÃ¼gen' : 'Spieler Anmeldung'}</h2>
 
 
 {!showRegSuccess ? (
@@ -4281,9 +4454,27 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <div>
 
+<label className="block text-xs font-bold text-slate-500 uppercase mb-1">Verein (optional)</label>
+
+<input type="text" value={regClub} onChange={e => setRegClub(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="TC Musterstadt"/>
+
+</div>
+
+<div>
+
+<label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail (optional)</label>
+
+<input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="max@example.com"/>
+
+</div>
+
+<div>
+
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geburtsdatum</label>
 
 <input type="date" value={regBirthDate} onChange={e => setRegBirthDate(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"/>
+
+<div className="text-xs text-slate-500 mt-1">Altersklasse (automatisch): <span className="font-bold text-emerald-600">{regPreviewAge}</span> â€“ anhand des Geburtsdatums</div>
 
 </div>
 
@@ -4291,15 +4482,17 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Niveau</label>
 
-<select value={regLevel} onChange={(e) => setRegLevel(e.target.value)} className="w-full p-3 border rounded-lg bg-white">
+<select value={regLevel} onChange={(e) => setRegLevel(e.target.value as Level)} className="w-full p-3 border rounded-lg bg-white">
 
-<option value="A">A (Profi)</option>
+<option value="A">{LEVEL_LABELS.A}</option>
 
-<option value="B">B (Fortgeschritten)</option>
+<option value="B">{LEVEL_LABELS.B}</option>
 
-<option value="C">C (Anfänger)</option>
+<option value="C">{LEVEL_LABELS.C}</option>
 
 </select>
+
+
 
 </div>
 
@@ -4366,7 +4559,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <button onClick={handleRegistration} disabled={!regName || !regBirthDate} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl mt-4 transition shadow-xl shadow-emerald-100">
 
-{isAdmin ? 'Hinzufügen' : 'Anmelden'}
+{isAdmin ? 'HinzufÃ¼gen' : 'Anmelden'}
 
 </button>
 
@@ -4380,7 +4573,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <h3 className="text-xl font-bold text-green-700">Erledigt!</h3>
 
-<button onClick={() => setShowRegSuccess(false)} className="mt-8 text-emerald-600 font-bold hover:underline">Zurück</button>
+<button onClick={() => setShowRegSuccess(false)} className="mt-8 text-emerald-600 font-bold hover:underline">ZurÃ¼ck</button>
 
 </div>
 
@@ -4425,7 +4618,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className="flex-1 p-2.5 border rounded-lg bg-slate-50">
 
-<option value="">-- Turnierserie wählen --</option>
+<option value="">-- Turnierserie wÃ¤hlen --</option>
 
 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
 
@@ -4443,7 +4636,7 @@ disabled={!selectedTournamentId}
 
 >
 
-<option value="">-- Spieltag / Runde wählen --</option>
+<option value="">-- Spieltag / Runde wÃ¤hlen --</option>
 
 {tournaments.find(t => t.id === selectedTournamentId)?.rounds.map(r => (
 
@@ -4455,7 +4648,7 @@ disabled={!selectedTournamentId}
 
 </div>
 
-{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswählen!</p>}
+{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswÃ¤hlen!</p>}
 
 </div>
 
@@ -4468,18 +4661,25 @@ disabled={!selectedTournamentId}
 
 <div className="flex justify-between items-center mb-2">
 
-<span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Filter size={12}/> Filter für Auswahl</span>
+<span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Filter size={12}/> Filter fÃ¼r Auswahl</span>
 
 </div>
 
-<div className="flex gap-2">
+<div className="flex gap-2 flex-wrap items-center">
 
 <select value={inputAgeGroupFilter} onChange={e => setInputAgeGroupFilter(e.target.value)} className="text-xs p-1 border rounded">
 
 <option value="All">Alle Altersklassen</option>
 
-{getSortedAgeGroups().filter(g => g!=='All').map(g => <option key={g} value={g}>{g}</option>)}
+{getSortedAgeGroups().filter(g => g!=='All').map(g => <option key={g} value={g}>{displayAgeGroup(g)}</option>)}
 
+</select>
+
+<select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className="text-xs p-1.5 border rounded bg-white">
+<option value="race4">Zählweise: bis 4</option>
+<option value="race10">Zählweise: bis 10</option>
+<option value="race15">Zählweise: bis 15</option>
+<option value="sets">Zählweise: Sätze</option>
 </select>
 
 </div>
@@ -4512,17 +4712,17 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50">
 
-<option value="">-- Wählen --</option>
+<option value="">-- WÃ¤hlen --</option>
 
 {players
 
-.filter(p => inputAgeGroupFilter === 'All' || calculateAgeGroup(p.birthDate) === inputAgeGroupFilter)
+.filter(p => inputAgeGroupFilter === 'All' || calculateAgeGroup(p) === inputAgeGroupFilter)
 
 .filter(p => !inputPlayerSearch || p.name.toLowerCase().includes(inputPlayerSearch.toLowerCase()))
 
 .sort((a,b) => a.name.localeCompare(b.name))
 
-.map(p => <option key={p.id} value={p.id}>{p.name} {p.isTeam && '(Team)'} ({calculateAgeGroup(p.birthDate)})</option>
+.map(p => <option key={p.id} value={p.id}>{p.name} {p.isTeam && '(Team)'} ({calculateAgeGroup(p)})</option>
 
 )}
 
@@ -4535,7 +4735,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase">Gegner wählen</label>
+<label className="text-xs font-bold text-slate-500 uppercase">Gegner wÃ¤hlen</label>
 
 <input
 
@@ -4553,13 +4753,14 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50 focus:bg-white transition">
 
-<option value="">-- Gegner wählen --</option>
+<option value="">-- Gegner wÃ¤hlen --</option>
 
 {players
 
 .filter(p => p.id !== selectedPlayerId)
 
-.filter(p => inputAgeGroupFilter === 'All' || calculateAgeGroup(p.birthDate) === inputAgeGroupFilter)
+.filter(p => inputAgeGroupFilter === 'All' || calculateAgeGroup(p) === inputAgeGroupFilter)
+.filter(p => !selectedPlayerLevel || p.level === selectedPlayerLevel)
 
 .filter(p => !inputOpponentSearch || p.name.toLowerCase().includes(inputOpponentSearch.toLowerCase()))
 
@@ -4567,7 +4768,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 .map(p => (
 
-<option key={p.id} value={p.id}>{p.name} {p.isTeam && '(Team)'} ({calculateAgeGroup(p.birthDate)})</option>
+<option key={p.id} value={p.id}>{p.name} {p.isTeam && '(Team)'} ({calculateAgeGroup(p)})</option>
 
 ))}
 
@@ -4605,7 +4806,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 </div>
 
-<button onClick={addSet} className="mt-3 text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline"><Plus size={14}/> Weiteren Satz hinzufügen</button>
+<button onClick={addSet} className="mt-3 text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline"><Plus size={14}/> Weiteren Satz hinzufÃ¼gen</button>
 
 </div>
 
@@ -4658,7 +4859,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <input type="text" placeholder="Passwort" className="bg-slate-700 border-none rounded p-2 text-sm text-white" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}/>
 
-<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">Hinzufügen</button>
+<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">HinzufÃ¼gen</button>
 
 </div>
 
@@ -4699,6 +4900,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 {pendingRegistrations.map(req => {
 
 const tourName = tournaments.find(t => t.id === req.desiredTournamentId)?.name;
+const ageLabel = formatAgeGroupLabel(calculateAgeGroup(req.birthDate));
 
 return (
 
@@ -4706,11 +4908,11 @@ return (
 
 <div>
 
-<div className="font-bold text-slate-800">{req.name} <span className="text-slate-400 font-normal">({new Date(req.birthDate).getFullYear()})</span></div>
+<div className="font-bold text-slate-800">{req.name} <span className="text-slate-400 font-normal">({ageLabel})</span></div>
 
 <div className="text-xs text-slate-500 mt-1">
 
-Niveau {req.level || '?'} • {tourName ? `Will zu: ${tourName}` : 'Allgemein'}
+Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}` : ''} {req.email ? ` - ${req.email}` : ''} {tourName ? ` - Will zu: ${tourName}` : ''}
 
 </div>
 
@@ -4766,7 +4968,7 @@ Niveau {req.level || '?'} • {tourName ? `Will zu: ${tourName}` : 'Allgemein'}
 
 {isGenerating ? <Loader2 className="animate-spin text-slate-400" size={16}/> : (
 
-<button onClick={() => deleteTournament(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Turnier & Ergebnisse löschen"><Trash2 size={16}/></button>
+<button onClick={() => deleteTournament(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Turnier & Ergebnisse lÃ¶schen"><Trash2 size={16}/></button>
 
 )}
 
@@ -4804,7 +5006,7 @@ Niveau {req.level || '?'} • {tourName ? `Will zu: ${tourName}` : 'Allgemein'}
 
 ) : (
 
-<button onClick={() => setAddingRoundToTournamentId(t.id)} className="ml-6 text-xs text-emerald-600 hover:underline flex items-center gap-1 mt-2"><PlusCircle size={12}/> Spieltag hinzufügen</button>
+<button onClick={() => setAddingRoundToTournamentId(t.id)} className="ml-6 text-xs text-emerald-600 hover:underline flex items-center gap-1 mt-2"><PlusCircle size={12}/> Spieltag hinzufÃ¼gen</button>
 
 )}
 
@@ -4905,7 +5107,7 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 
 <button onClick={deleteTestData} disabled={isGenerating} className="bg-white border border-red-200 text-red-500 hover:bg-red-50 disabled:bg-slate-50 disabled:text-slate-300 text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2">
 
-<Trash2 size={16}/> Alles löschen
+<Trash2 size={16}/> Alles lÃ¶schen
 
 </button>
 
@@ -4932,3 +5134,4 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 
 
 export default TennisManager;
+
