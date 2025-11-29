@@ -88,11 +88,17 @@ return hashHex;
 type Level = 'A' | 'B' | 'C';
 type AgeGroup = 'Red' | 'Orange' | 'Green' | 'Yellow';
 type ScoringMode = 'sets' | 'race4' | 'race10' | 'race15';
+type PlannerTab = 'ranking' | 'bracket' | 'planner' | 'players' | 'register' | 'input' | 'admin';
 
 const LEVEL_LABELS: Record<Level, string> = {
   A: 'A - Turniererfahren',
   B: 'B - Mittelstufe',
   C: 'C - Einsteiger'
+};
+const LEVEL_COLORS: Record<Level, string> = {
+  A: 'bg-red-100 text-red-800 border border-red-200',
+  B: 'bg-amber-100 text-amber-800 border border-amber-200',
+  C: 'bg-emerald-100 text-emerald-800 border border-emerald-200'
 };
 
 const AGE_GROUP_ORDER: AgeGroup[] = ['Red', 'Orange', 'Green', 'Yellow'];
@@ -250,6 +256,7 @@ isCloseLoss: boolean;
 
 timestamp: number;
 scoringMode?: ScoringMode;
+levelAtMatch?: Level;
 
 };
 
@@ -281,6 +288,15 @@ winner: Player | null;
 
 score: string;
 
+};
+
+type PlannedMatch = {
+  id: string;
+  ageGroup: AgeGroup;
+  level: Level;
+  round: number;
+  p1Id: string;
+  p2Id: string;
 };
 
 
@@ -340,7 +356,8 @@ REGISTRATIONS: 'tm_registrations',
 
 BRACKETS: 'tm_brackets_map', // Changed from single bracket to map
 
-ADMINS: 'tm_admins'
+ADMINS: 'tm_admins',
+PLANNER: 'tm_planner_fixtures'
 
 };
 
@@ -384,7 +401,7 @@ const [admins, setAdmins] = useState<AdminAccount[]>([]);
 
 // UI State
 
-const [activeTab, setActiveTab] = useState<'ranking' | 'register' | 'players' | 'input' | 'admin' | 'bracket'>('ranking');
+const [activeTab, setActiveTab] = useState<PlannerTab>('ranking');
 
 const [viewingPlayer, setViewingPlayer] = useState<Player | null>(null);
 
@@ -513,6 +530,18 @@ const [bracketSize, setBracketSize] = useState<number>(8);
 const [bracketType, setBracketType] = useState<'ko' | 'group'>('ko');
 
 const [groupSizeInput, setGroupSizeInput] = useState<number>(4);
+const [groupMatchMode, setGroupMatchMode] = useState<'auto' | 'single' | 'double'>('auto');
+
+// Planner Tab
+const [plannerFixtures, setPlannerFixtures] = useState<Record<string, PlannedMatch[]>>({});
+const [plannerAgeGroup, setPlannerAgeGroup] = useState<AgeGroup>('Red');
+const [plannerMatchMode, setPlannerMatchMode] = useState<'auto' | 'single' | 'double'>('auto');
+const [plannerScoreInput, setPlannerScoreInput] = useState<Record<string, string>>({});
+const [plannerScoringMode, setPlannerScoringMode] = useState<ScoringMode>('race10');
+const [plannerNewName, setPlannerNewName] = useState('');
+const [plannerNewBirth, setPlannerNewBirth] = useState('');
+const [plannerNewLevel, setPlannerNewLevel] = useState<Level>('C');
+const [plannerNewClub, setPlannerNewClub] = useState('');
 
 
 
@@ -536,13 +565,14 @@ useEffect(() => {
     // HIER Ã„NDERN WIR WAS:
     
     // Wir laden alles parallel vom Server
-    const [p, t, r, reg, bMap, a] = await Promise.all([
+    const [p, t, r, reg, bMap, a, planner] = await Promise.all([
        apiLoad(STORAGE_KEYS.PLAYERS),
        apiLoad(STORAGE_KEYS.TOURNAMENTS),
        apiLoad(STORAGE_KEYS.RESULTS),
        apiLoad(STORAGE_KEYS.REGISTRATIONS),
        apiLoad(STORAGE_KEYS.BRACKETS),
-       apiLoad(STORAGE_KEYS.ADMINS)
+       apiLoad(STORAGE_KEYS.ADMINS),
+       apiLoad(STORAGE_KEYS.PLANNER)
     ]);
 
     if (p) setPlayers(p);
@@ -553,6 +583,7 @@ useEffect(() => {
     if (r) setResults(r);
     if (reg) setPendingRegistrations(reg);
     if (bMap) setBrackets(bMap);
+    if (planner) setPlannerFixtures(planner);
     
     // Admin Init
     if (a) {
@@ -621,6 +652,11 @@ setBrackets(newBrackets);
 
 saveData(STORAGE_KEYS.BRACKETS, newBrackets);
 
+};
+
+const updatePlannerFixtures = (newFixtures: Record<string, PlannedMatch[]>) => {
+  setPlannerFixtures(newFixtures);
+  saveData(STORAGE_KEYS.PLANNER, newFixtures);
 };
 
 
@@ -766,6 +802,15 @@ return present;
 
 const regPreviewAge = regBirthDate ? formatAgeGroupLabel(calculateAgeGroup(regBirthDate)) : 'wird automatisch zugewiesen';
 const displayAgeGroup = (g: AgeGroup | 'All') => g === 'All' ? 'Alle Altersklassen' : formatAgeGroupLabel(g);
+const renderLevelBadge = (level?: Level | null, size: 'sm' | 'md' = 'md') => {
+  if (!level) return null;
+  const sizeClasses = size === 'sm' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
+  return (
+    <span className={`inline-flex items-center font-semibold rounded-full ${LEVEL_COLORS[level]} ${sizeClasses}`}>
+      Level {level}
+    </span>
+  );
+};
 
 
 
@@ -783,6 +828,161 @@ const weight = Math.max(1, maxGroup / participantCount);
 
 return parseFloat(weight.toFixed(2));
 
+};
+
+const getMatchLevel = (match: MatchRecord, fallback?: Level | null) => match.levelAtMatch || fallback || null;
+
+const getPlannerKey = (age: AgeGroup, level: Level) => `${age}-${level}`;
+
+const generateRoundRobin = (ids: string[], mode: 'single' | 'double') => {
+  const players = [...ids];
+  if (players.length % 2 === 1) players.push('bye');
+  const totalRounds = players.length - 1;
+  const fixtures: { round: number; p1Id: string; p2Id: string }[] = [];
+  for (let r = 0; r < totalRounds; r++) {
+    for (let i = 0; i < players.length / 2; i++) {
+      const p1 = players[i];
+      const p2 = players[players.length - 1 - i];
+      if (p1 !== 'bye' && p2 !== 'bye') {
+        fixtures.push({ round: r + 1, p1Id: p1, p2Id: p2 });
+      }
+    }
+    // Rotate (keep first fixed)
+    const last = players.pop();
+    if (last) players.splice(1, 0, last);
+  }
+  if (mode === 'double') {
+    const extra = fixtures.map(f => ({ round: f.round + totalRounds, p1Id: f.p2Id, p2Id: f.p1Id }));
+    fixtures.push(...extra);
+  }
+  return fixtures;
+};
+
+const ensurePlannerTournament = (age: AgeGroup, level: Level) => {
+  const id = `planner-${age}-${level}`;
+  const exists = tournaments.find(t => t.id === id);
+  if (exists) return id;
+  const newT = {
+    id,
+    name: `Spielplan ${age}/${level}`,
+    date: new Date().toISOString().split('T')[0],
+    isActive: false,
+    rounds: []
+  } as Tournament;
+  updateTournaments([...tournaments, newT]);
+  return id;
+};
+
+const collectPlannerStats = (age: AgeGroup, level: Level) => {
+  const eligible = players.filter(p => calculateAgeGroup(p) === age && p.level === level);
+  const participantCount = eligible.length;
+  const weight = getGroupSizeWeight(participantCount, age, level);
+  const stats = eligible.map(p => {
+    const res = results.find(r => r.playerId === p.id);
+    const matches = res ? res.matches.filter(m => getMatchLevel(m, p.level || null) === level) : [];
+    let wins = 0, close = 0, losses = 0;
+    // Teilnahme pro Turniertag: wir zählen jedes RoundId einmal, wenn ein Match dort vorliegt
+    const roundIds = new Set<string>();
+    matches.forEach(m => {
+      if (m.isWin) wins++;
+      else if (m.isCloseLoss) close++;
+      else losses++;
+      if (m.roundId) roundIds.add(m.roundId);
+    });
+    const basePoints = wins * 2 + close * 1;
+    const participationPoints = roundIds.size > 0 ? roundIds.size : (matches.length > 0 ? 1 : 0);
+    const points = parseFloat((basePoints * weight + participationPoints).toFixed(1));
+    return { player: p, wins, losses, close, points, weight, participationPoints };
+  });
+  return { stats, weight, participantCount };
+};
+
+const generatePlannerForAgeGroup = (age: AgeGroup) => {
+  const newMap = { ...plannerFixtures };
+  (['A','B','C'] as Level[]).forEach(level => {
+    const eligible = players.filter(p => calculateAgeGroup(p) === age && p.level === level);
+    const mode: 'single' | 'double' = plannerMatchMode === 'auto'
+      ? (eligible.length <= 4 ? 'double' : 'single')
+      : plannerMatchMode;
+    const fixtures = generateRoundRobin(eligible.map(p => p.id), mode).map(f => ({
+      id: generateId(),
+      ageGroup: age,
+      level,
+      round: f.round,
+      p1Id: f.p1Id,
+      p2Id: f.p2Id
+    }));
+    newMap[getPlannerKey(age, level)] = fixtures;
+  });
+  updatePlannerFixtures(newMap);
+  addToast(`Auslosung für ${displayAgeGroup(age)} aktualisiert`, 'success');
+};
+
+const savePlannerResult = (fixture: PlannedMatch) => {
+  if (!isAdmin) return;
+  const scoreStr = (plannerScoreInput[fixture.id] || '').trim();
+  if (!scoreStr) { addToast('Bitte Spielstand eintragen', 'error'); return; }
+  const p1 = players.find(p => p.id === fixture.p1Id);
+  const p2 = players.find(p => p.id === fixture.p2Id);
+  if (!p1 || !p2) { addToast('Spieler nicht gefunden', 'error'); return; }
+  const mode = plannerScoringMode;
+  const res1 = analyzeSingleScore(scoreStr, mode);
+  const res2 = analyzeSingleScore(reverseScoreString(scoreStr), mode);
+  const tournamentId = ensurePlannerTournament(fixture.ageGroup, fixture.level);
+  let updatedResults = [...results];
+  const addMatch = (playerId: string, opponentId: string, opponentName: string, res: {isWin:boolean; isCloseLoss:boolean}) => {
+    const matchId = generateId();
+    const entry: MatchRecord = {
+      id: matchId,
+      roundId: `planner-${fixture.round}`,
+      opponentId,
+      opponentName,
+      score: playerId === p1.id ? scoreStr : reverseScoreString(scoreStr),
+      isWin: res.isWin,
+      isCloseLoss: res.isCloseLoss,
+      timestamp: Date.now(),
+      scoringMode: mode,
+      levelAtMatch: fixture.level
+    };
+    const idx = updatedResults.findIndex(r => r.playerId === playerId && r.tournamentId === tournamentId);
+    if (idx >= 0) {
+      updatedResults[idx].matches.push(entry);
+    } else {
+      updatedResults.push({ id: generateId(), playerId, tournamentId, matches: [entry] });
+    }
+  };
+  addMatch(p1.id, p2.id, p2.name, res1);
+  addMatch(p2.id, p1.id, p1.name, res2);
+  updateResults(updatedResults);
+  const newMap = { ...plannerFixtures };
+  newMap[getPlannerKey(fixture.ageGroup, fixture.level)] = (newMap[getPlannerKey(fixture.ageGroup, fixture.level)] || []).filter(f => f.id !== fixture.id);
+  updatePlannerFixtures(newMap);
+  setPlannerScoreInput(prev => {
+    const copy = { ...prev };
+    delete copy[fixture.id];
+    return copy;
+  });
+  addToast('Ergebnis gespeichert', 'success');
+};
+
+const quickAddPlannerPlayer = () => {
+  if (!plannerNewName || !plannerNewBirth) {
+    addToast('Name und Geburtsdatum angeben', 'error');
+    return;
+  }
+  const newPlayer: Player = {
+    id: generateId(),
+    name: plannerNewName,
+    birthDate: plannerNewBirth,
+    level: plannerNewLevel,
+    club: plannerNewClub || undefined
+  };
+  updatePlayers([...players, newPlayer]);
+  setPlannerNewName('');
+  setPlannerNewBirth('');
+  setPlannerNewClub('');
+  setPlannerNewLevel('C');
+  addToast('Spieler hinzugefügt', 'success');
 };
 
 
@@ -1030,23 +1230,33 @@ groups[idx % numGroups].players.push(p);
 
 groups.forEach(g => {
 
+const matchesPerPair = groupMatchMode === 'auto'
+  ? (g.players.length <= 4 ? 2 : 1)
+  : groupMatchMode === 'double' ? 2 : 1;
+
 for (let i = 0; i < g.players.length; i++) {
 
 for (let j = i + 1; j < g.players.length; j++) {
+
+for (let repeat = 0; repeat < matchesPerPair; repeat++) {
+
+const swap = repeat % 2 === 1;
 
 g.matches.push({
 
 id: generateId(),
 
-p1: g.players[i],
+p1: swap ? g.players[j] : g.players[i],
 
-p2: g.players[j],
+p2: swap ? g.players[i] : g.players[j],
 
 winner: null,
 
 score: ''
 
 });
+
+}
 
 }
 
@@ -1504,12 +1714,14 @@ if (mode !== 'sets') {
   const diff = Math.abs(p1 - p2);
   let isCloseLoss = false;
   if (!isWin) {
-    if (mode === 'race10') {
+    if (mode === 'race4') {
+      isCloseLoss = (p2 >= 4 && p1 >= 3 && diff === 1);
+    } else if (mode === 'race10') {
       isCloseLoss = (p2 >= 10 && p1 >= 9 && diff === 1);
     } else if (mode === 'race15') {
       isCloseLoss = (p2 >= 15 && p1 >= 12 && diff <= 3);
     } else {
-      isCloseLoss = false; // race4 keine knappen Niederlagen
+      isCloseLoss = false;
     }
   }
   return { isWin, isCloseLoss };
@@ -1852,13 +2064,6 @@ const newScore = newScoreRaw.trim();
 
 const reversedScore = reverseScoreString(newScore);
 
-
-const statsP1 = analyzeSingleScore(newScore);
-
-const statsP2 = analyzeSingleScore(reversedScore);
-
-
-
 const updatedResults = results.map(res => {
 
 const matchIndex = res.matches.findIndex(m => m.id === matchId);
@@ -1870,6 +2075,12 @@ if (matchIndex === -1) return res;
 const newMatches = [...res.matches];
 
 const match = newMatches[matchIndex];
+
+const mode = match.scoringMode || scoringMode;
+
+const statsP1 = analyzeSingleScore(newScore, mode);
+
+const statsP2 = analyzeSingleScore(reversedScore, mode);
 
 
 
@@ -1885,7 +2096,8 @@ score: newScore,
 
 isWin: statsP1.isWin,
 
-isCloseLoss: statsP1.isCloseLoss
+isCloseLoss: statsP1.isCloseLoss,
+scoringMode: mode
 
 };
 
@@ -1901,7 +2113,8 @@ score: reversedScore,
 
 isWin: statsP2.isWin,
 
-isCloseLoss: statsP2.isCloseLoss
+isCloseLoss: statsP2.isCloseLoss,
+scoringMode: mode
 
 };
 
@@ -2053,12 +2266,14 @@ const player1 = players.find(p => p.id === selectedPlayerId);
 const player2 = players.find(p => p.id === selectedOpponentId);
 
 if (player1 && player2) {
-  if (player1.level && player2.level && player1.level !== player2.level) {
-    addToast('Nur identische Leistungsklassen d\u00fcrfen gegeneinander spielen', 'error');
+  const level1 = player1.level;
+  const level2 = player2.level;
+  if (!level1 || !level2) {
+    addToast('Bitte beiden Spielern eine Leistungsklasse (A/B/C) zuweisen, bevor ein Match erfasst wird', 'error');
     return;
   }
-  if ((player1.level && !player2.level) || (!player1.level && player2.level)) {
-    addToast('Bitte beiden Spielern dieselbe Leistungsklasse zuweisen, bevor ein Match erfasst wird', 'error');
+  if (level1 !== level2) {
+    addToast('Nur identische Leistungsklassen d\u00fcrfen gegeneinander spielen', 'error');
     return;
   }
 }
@@ -2069,6 +2284,8 @@ const timestamp = Date.now();
 
 const matchId = generateId();
 
+const levelAtMatchP1 = player1?.level || null;
+const levelAtMatchP2 = player2?.level || null;
 
 
 const matchP1: MatchRecord = {
@@ -2077,7 +2294,7 @@ id: matchId, roundId: selectedRoundId, opponentId: selectedOpponentId,
 
 opponentName: player2 ? player2.name : 'Unbekannt', score: scoreStr,
 
-isWin: matchAnalysis.isWin, isCloseLoss: matchAnalysis.isCloseLoss, timestamp, scoringMode
+isWin: matchAnalysis.isWin, isCloseLoss: matchAnalysis.isCloseLoss, timestamp, scoringMode, levelAtMatch: levelAtMatchP1 || undefined
 
 };
 
@@ -2092,7 +2309,7 @@ id: matchId, roundId: selectedRoundId, opponentId: selectedPlayerId,
 
 opponentName: player1 ? player1.name : 'Unbekannt', score: reversedScore,
 
-isWin: resultP2.isWin, isCloseLoss: resultP2.isCloseLoss, timestamp, scoringMode
+isWin: resultP2.isWin, isCloseLoss: resultP2.isCloseLoss, timestamp, scoringMode, levelAtMatch: levelAtMatchP2 || undefined
 
 };
 
@@ -2407,7 +2624,7 @@ newResults[myResultIndex].matches.push({
 
 id: matchId, roundId: round, opponentId: p2.id, opponentName: p2.name,
 
-score, isWin: resP1.isWin, isCloseLoss: resP1.isCloseLoss, timestamp
+score, isWin: resP1.isWin, isCloseLoss: resP1.isCloseLoss, timestamp, scoringMode: 'sets', levelAtMatch: p1.level
 
 });
 
@@ -2421,7 +2638,7 @@ newResults[p2Index].matches.push({
 
 id: matchId, roundId: round, opponentId: p1.id, opponentName: p1.name,
 
-score: reverseScoreString(score), isWin: resP2.isWin, isCloseLoss: resP2.isCloseLoss, timestamp
+score: reverseScoreString(score), isWin: resP2.isWin, isCloseLoss: resP2.isCloseLoss, timestamp, scoringMode: 'sets', levelAtMatch: p2.level
 
 });
 
@@ -2521,6 +2738,32 @@ if (!res) return;
 
 
 
+const countParticipants = (roundScope: 'all' | string | null, level: Level | null) => {
+
+return players.filter(p => {
+
+if (calculateAgeGroup(p) !== ageGroup) return false;
+
+const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
+
+if (!r) return false;
+
+return r.matches.some(m => {
+
+const inScope = roundScope === 'all' ? true : roundScope === null ? !m.roundId : m.roundId === roundScope;
+
+const matchLevel = getMatchLevel(m, p.level || null);
+
+return inScope && (level ? matchLevel === level : true);
+
+});
+
+}).length;
+
+};
+
+
+
 const aggregateRounds = rankingRoundScope === 'all' && tourn.rounds && tourn.rounds.length > 0;
 
 
@@ -2543,11 +2786,13 @@ const matchesInRound = res.matches.filter(m => m.roundId === round.id);
 
 if (matchesInRound.length === 0) return;
 
+const roundLevel = getMatchLevel(matchesInRound[0], player.level || null);
 
 
 // Teilnahme bestÃ¤tigt (hat Matches in einer Runde dieses Turniers)
 
 hasPlayedInScope = true;
+participationCount++;
 
 
 
@@ -2563,15 +2808,15 @@ return r?.matches.some(m => m.roundId === round.id);
 
 
 
-const roundWeight = getGroupSizeWeight(roundParticipants, ageGroup as AgeGroup, player.level);
-
-
-
 matchesInRound.forEach(m => {
 
 const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
 
-aggregatedPoints += base * roundWeight;
+const levelForMatch = getMatchLevel(m, roundLevel);
+
+const matchWeight = getGroupSizeWeight(countParticipants(round.id, levelForMatch), ageGroup as AgeGroup, levelForMatch);
+
+aggregatedPoints += base * matchWeight;
 
 if(m.isWin) totalWins++;
 
@@ -2591,13 +2836,13 @@ if(matchesNoRound.length > 0) {
 
 hasPlayedInScope = true; // Hat Matches ohne Runde
 
-const totalP = players.filter(p => calculateAgeGroup(p) === ageGroup && results.find(r => r.playerId === p.id && r.tournamentId === tourn.id)).length;
-
-const w = getGroupSizeWeight(totalP, ageGroup as AgeGroup, player.level);
-
 matchesNoRound.forEach(m => {
 
 const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
+
+const levelForMatch = getMatchLevel(m, player.level || null);
+
+const w = getGroupSizeWeight(countParticipants(null, levelForMatch), ageGroup as AgeGroup, levelForMatch);
 
 aggregatedPoints += base * w;
 
@@ -2615,19 +2860,13 @@ totalMatches += matchesNoRound.length;
 
 if (totalMatches > 0) {
 
-const uniqueTournParticipants = players.filter(p => {
+const summaryLevel = getMatchLevel(res.matches[0], player.level || null);
 
-if (calculateAgeGroup(p) !== ageGroup) return false;
+const uniqueTournParticipants = countParticipants('all', summaryLevel);
 
-const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
+const tournWeight = getGroupSizeWeight(uniqueTournParticipants, ageGroup as AgeGroup, summaryLevel);
 
-return r && r.matches.length > 0;
-
-}).length;
-
-const tournWeight = getGroupSizeWeight(uniqueTournParticipants, ageGroup as AgeGroup, player.level);
-
-aggregatedPoints += 1; // Teilnahme ungewichtet
+aggregatedPoints += Math.max(1, participationCount); // Teilnahme: mind. 1, sonst pro Spieltag
 
 totalPoints += aggregatedPoints;
 
@@ -2641,13 +2880,13 @@ raw: aggregatedPoints.toFixed(1),
 
 weighted: aggregatedPoints.toFixed(1),
 
-stats: `${totalWins} S (Mix) / ${totalCL} KN (Mix)`,
+stats: `Teilnahme: ${Math.max(1, participationCount)} ? ${totalWins} S (x${tournWeight.toFixed(2)}) / ${totalCL} KN (x${tournWeight.toFixed(2)})`,
 
 participationPoints: 1, // Ungewichtet
 
 participants: uniqueTournParticipants,
 
-weight: 'Mix'
+weight: tournWeight.toFixed(2)
 
 });
 
@@ -2678,23 +2917,13 @@ return; // Keine Matches im Scope -> weiter zum nÃ¤chsten Turnier
 
 
 
-const participantCount = players.filter(p => {
+const levelInScope = getMatchLevel(matchesInScope[0], player.level || null);
 
-const pAgeGroup = calculateAgeGroup(p);
-
-if (pAgeGroup !== ageGroup) return false;
-
-const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
-
-if (!r) return false;
-
-return r.matches.some(m => rankingRoundScope === 'all' || m.roundId === rankingRoundScope);
-
-}).length;
+const participantCount = countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelInScope);
 
 
 
-const groupWeight = getGroupSizeWeight(participantCount, ageGroup as AgeGroup, player.level);
+const groupWeight = getGroupSizeWeight(participantCount, ageGroup as AgeGroup, levelInScope);
 
 let matchPoints = 0;
 
@@ -2708,7 +2937,11 @@ matchesInScope.forEach(m => {
 
 const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
 
-matchPoints += base * groupWeight;
+const levelForMatch = getMatchLevel(m, levelInScope);
+
+const weight = getGroupSizeWeight(countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelForMatch), ageGroup as AgeGroup, levelForMatch);
+
+matchPoints += base * weight;
 
 if (m.isWin) wins++; else if (m.isCloseLoss) closeLosses++;
 
@@ -2716,7 +2949,7 @@ if (m.isWin) wins++; else if (m.isCloseLoss) closeLosses++;
 
 
 
-const participationPoints = 1; // Teilnahme ungewichtet
+const participationPoints = 1; // Teilnahme ungewichtet (dieser Spieltag)
 
 const turnierScore = participationPoints + matchPoints;
 
@@ -2731,7 +2964,7 @@ raw: turnierScore.toFixed(1),
 
 weighted: turnierScore.toFixed(1),
 
-stats: `${wins} S (x${groupWeight.toFixed(2)}) / ${closeLosses} KN (x${groupWeight.toFixed(2)})`,
+stats: `Teilnahme: ${participationPoints} ? ${wins} S (x${groupWeight.toFixed(2)}) / ${closeLosses} KN (x${groupWeight.toFixed(2)})`,
 
 participationPoints: 1, // Ungewichtet
 
@@ -2961,13 +3194,13 @@ return (
 
 </h2>
 
-<div className="flex gap-2 mt-2 text-slate-300 text-sm">
+<div className="flex gap-2 mt-2 items-center text-slate-300 text-sm">
 
 <span>{formatAgeGroupLabel(calculateAgeGroup(viewingPlayer))}</span>
 
 <span>â€¢</span>
 
-<span>Level {viewingPlayer.level ? LEVEL_LABELS[viewingPlayer.level] : '-'}</span>
+{renderLevelBadge(viewingPlayer.level)}
 
 </div>
 
@@ -3481,6 +3714,12 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 </button>
 
+<button onClick={() => setActiveTab('planner')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'planner' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+
+<Calendar className="text-emerald-600" size={18}/> Spielplan
+
+</button>
+
 <button onClick={() => setActiveTab('players')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'players' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
 
 <Users size={18} /> Spieler
@@ -3627,9 +3866,10 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <li><b>Knappe Niederlage:</b> 1 Punkt (x Gruppengewicht)</li>
 
-<li><b>Teilnahme:</b> 1 Punkt (x Gruppengewicht)</li>
+<li><b>Teilnahme:</b> 1 Punkt (ohne Gewichtung)</li>
 
-<li><b>Gruppengewicht:</b> Baseline = 8 Spieler (Faktor 1.0). Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.5). GroÃŸe Gruppen werden nicht bestraft (min 1.0).</li>
+<li><b>Gruppengewicht:</b> Basis ist die groesste Gruppe gleicher Alters- & Leistungsklasse. Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.5), grosse Gruppen werden nicht bestraft (min 1.0).</li>
+<li><b>Zaehlweisen:</b> Race-4 (knapp bei 4:3), Race-10 (knapp bei 10:9), Race-15 (knapp bis max. 2-3 Punkte Differenz ab 15).</li>
 
 </ul>
 
@@ -3695,7 +3935,7 @@ return (
 
 </div>
 
-{player.level && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 mt-1 inline-block">Niveau {player.level}</span>}
+{renderLevelBadge(player.level, 'sm')}
 
 </td>
 
@@ -3879,6 +4119,28 @@ isAdmin ? (
 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Spieler / Gruppe</label>
 
 <input type="number" min="3" max="10" value={groupSizeInput} onChange={e => setGroupSizeInput(parseInt(e.target.value))} className="p-2 border rounded w-24 text-sm" />
+
+</div>
+
+)}
+
+{bracketType === 'group' && (
+
+<div>
+
+<label className="text-xs font-bold text-slate-500 uppercase block mb-1">Matches je Gegner</label>
+
+<select value={groupMatchMode} onChange={e => setGroupMatchMode(e.target.value as 'auto' | 'single' | 'double')} className="p-2 border rounded w-40 text-sm">
+
+<option value="auto">Automatisch</option>
+
+<option value="single">1x jeder gegen jeden</option>
+
+<option value="double">2x jeder gegen jeden</option>
+
+</select>
+
+<p className="text-[11px] text-slate-500 mt-1">Auto: bis 4 Spieler doppelt, sonst einfach.</p>
 
 </div>
 
@@ -4229,6 +4491,184 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
 )}
 
+{/* --- TAB: SPIELPLAN (AUSLOSUNG) --- */}
+
+{activeTab === 'planner' && (
+<div className="animate-in fade-in space-y-6">
+
+<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
+<div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
+<div>
+<h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Calendar className="text-emerald-600" size={18}/> Spielplan nach Alters- & Leistungsklasse</h2>
+<p className="text-sm text-slate-600">Eine Tabelle pro Level. Matches werden erst erzeugt, wenn du auf „Auslosen“ klickst.</p>
+</div>
+<div className="flex gap-3 items-center">
+<select value={plannerAgeGroup} onChange={e => setPlannerAgeGroup(e.target.value as AgeGroup)} className="p-2 border rounded-lg bg-white text-sm">
+{getSortedAgeGroups().filter(g => g !== 'All').map(g => (
+  <option key={g} value={g}>{displayAgeGroup(g)}</option>
+))}
+</select>
+<select value={plannerMatchMode} onChange={e => setPlannerMatchMode(e.target.value as 'auto' | 'single' | 'double')} className="p-2 border rounded-lg bg-white text-sm">
+  <option value="auto">Automatisch</option>
+  <option value="single">1x jeder gegen jeden</option>
+  <option value="double">2x jeder gegen jeden</option>
+</select>
+{isAdmin && (
+  <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded flex items-center gap-2">
+    <Shuffle size={16}/> Auslosen
+  </button>
+)}
+</div>
+
+{isAdmin && (
+  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 grid md:grid-cols-4 gap-3 items-end">
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name</label>
+      <input value={plannerNewName} onChange={e => setPlannerNewName(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Spielername"/>
+    </div>
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geburtsdatum</label>
+      <input type="date" value={plannerNewBirth} onChange={e => setPlannerNewBirth(e.target.value)} className="w-full p-2 border rounded text-sm"/>
+    </div>
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Level</label>
+      <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className="w-full p-2 border rounded text-sm bg-white">
+        <option value="A">{LEVEL_LABELS.A}</option>
+        <option value="B">{LEVEL_LABELS.B}</option>
+        <option value="C">{LEVEL_LABELS.C}</option>
+      </select>
+    </div>
+    <div>
+      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Verein (optional)</label>
+      <input value={plannerNewClub} onChange={e => setPlannerNewClub(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Verein"/>
+    </div>
+    <div className="md:col-span-4 flex justify-end">
+      <button onClick={quickAddPlannerPlayer} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded flex items-center gap-2"><UserPlus size={16}/> Spieler hinzufügen</button>
+    </div>
+  </div>
+)}
+
+<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+  <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><CalendarDays size={16}/> Turniertage</h4>
+  {tournaments.length === 0 ? (
+    <p className="text-sm text-slate-500">Keine Turniere angelegt.</p>
+  ) : (
+    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {tournaments.map(t => (
+        <div key={t.id} className="border border-slate-200 rounded-lg p-3">
+          <div className="font-bold text-slate-800">{t.name}</div>
+          <div className="text-xs text-slate-500 mb-2">{t.date}</div>
+          {t.rounds && t.rounds.length > 0 ? (
+            <ul className="text-xs text-slate-600 space-y-1">
+              {t.rounds.map(r => <li key={r.id}>• {r.name} ({r.date})</li>)}
+            </ul>
+          ) : <div className="text-xs text-slate-400">Keine Spieltage hinterlegt</div>}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+</div>
+</div>
+
+{(['A','B','C'] as Level[]).map(level => {
+  const key = getPlannerKey(plannerAgeGroup, level);
+  const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
+  const { stats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level);
+  const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
+  const upcoming = fixtures.slice(0, 5);
+  return (
+    <div key={level} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+      <div className="flex justify-between items-start gap-3">
+        <div>
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            {renderLevelBadge(level, 'md')}
+            <span className="text-slate-500 text-sm">Altersklasse: {displayAgeGroup(plannerAgeGroup)}</span>
+          </h3>
+          <div className="text-xs text-slate-500 mt-1">Teilnehmer: {participantCount} • Gruppengewicht: x{weight.toFixed(2)}</div>
+        </div>
+        {isAdmin && fixtures.length > 0 && (
+          <div className="text-xs text-slate-500">Runden: {Math.max(...fixtures.map(f => f.round))}</div>
+        )}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
+              <tr>
+                <th className="p-2">Name</th>
+                <th className="p-2">Verein</th>
+                <th className="p-2 text-center">Teiln.</th>
+                <th className="p-2 text-center">S</th>
+                <th className="p-2 text-center">KN</th>
+                <th className="p-2 text-center">N</th>
+                <th className="p-2 text-right">Punkte</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {stats.length === 0 ? (
+                <tr><td colSpan={7} className="p-4 text-center text-slate-400 text-sm">Noch keine Spieler in diesem Level.</td></tr>
+              ) : stats.map(s => (
+                <tr key={s.player.id}>
+                  <td className="p-2 font-bold text-slate-800">{s.player.name}</td>
+                  <td className="p-2 text-slate-500">{s.player.club || '-'}</td>
+                  <td className="p-2 text-center font-bold text-slate-700">{s.participationPoints}</td>
+                  <td className="p-2 text-center font-bold text-green-600">{s.wins}</td>
+                  <td className="p-2 text-center font-bold text-orange-500">{s.close}</td>
+                  <td className="p-2 text-center font-bold text-red-500">{s.losses}</td>
+                  <td className="p-2 text-right font-bold text-slate-800">{s.points.toFixed(1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-slate-500 uppercase">Nächste Begegnungen</span>
+            <span className="text-[11px] text-slate-400">{fixtures.length} geplant</span>
+          </div>
+          {fixtures.length === 0 ? (
+            <p className="text-sm text-slate-500">Noch keine Auslosung.</p>
+          ) : (
+            <div className="space-y-3">
+              {upcoming.map(f => (
+                <div key={f.id} className="bg-white rounded border border-slate-200 px-3 py-2 text-sm">
+                  <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Runde {f.round}</span><span>{LEVEL_LABELS[level]}</span></div>
+                  <div className="font-bold text-slate-800 mb-2">{resolveName(f.p1Id)} <span className="text-slate-400">vs</span> {resolveName(f.p2Id)}</div>
+                  {isAdmin && (
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="text"
+                        placeholder="z.B. 6:4 4:6 10:8"
+                        className="w-full p-2 border rounded text-xs"
+                        value={plannerScoreInput[f.id] || ''}
+                        onChange={e => setPlannerScoreInput(prev => ({ ...prev, [f.id]: e.target.value }))}
+                      />
+                      <div className="flex gap-2 items-center justify-between">
+                        <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className="p-1.5 border rounded text-xs">
+                          <option value="race4">Zaehlweise: bis 4</option>
+                          <option value="race10">Zaehlweise: bis 10</option>
+                          <option value="race15">Zaehlweise: bis 15</option>
+                          <option value="sets">Zaehlweise: Saetze</option>
+                        </select>
+                        <button onClick={() => savePlannerResult(f)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded">Speichern</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {fixtures.length > upcoming.length && <div className="text-[11px] text-slate-500">… weitere Begegnungen wurden geplant.</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+})}
+
+</div>
+)}
 
 {/* --- TAB: SPIELER (NEU) --- */}
 
@@ -4676,10 +5116,10 @@ disabled={!selectedTournamentId}
 </select>
 
 <select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className="text-xs p-1.5 border rounded bg-white">
-<option value="race4">Zählweise: bis 4</option>
-<option value="race10">Zählweise: bis 10</option>
-<option value="race15">Zählweise: bis 15</option>
-<option value="sets">Zählweise: Sätze</option>
+<option value="race4">Zaehlweise: bis 4</option>
+<option value="race10">Zaehlweise: bis 10</option>
+<option value="race15">Zaehlweise: bis 15</option>
+<option value="sets">Zaehlweise: Saetze</option>
 </select>
 
 </div>
@@ -5134,4 +5574,3 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 
 
 export default TennisManager;
-
