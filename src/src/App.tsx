@@ -59,7 +59,7 @@ return Date.now().toString(36) + Math.random().toString(36).substr(2);
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// Passwort-Hashing (SHA-256 Ã¼ber Web Crypto API)
+// Passwort-Hashing (SHA-256 über Web Crypto API)
 
 const hashPassword = async (password: string): Promise<string> => {
 
@@ -562,7 +562,7 @@ const [generationStatus, setGenerationStatus] = useState('');
 // --- INITIAL LOAD ---
 useEffect(() => {
   const loadData = async () => {
-    // HIER Ã„NDERN WIR WAS:
+    // HIER ÄNDERN WIR WAS:
     
     // Wir laden alles parallel vom Server
     const [p, t, r, reg, bMap, a, planner] = await Promise.all([
@@ -993,7 +993,7 @@ const handleCreateTeam = () => {
 
 if (!teamMember1 || !teamMember2 || teamMember1 === teamMember2) {
 
-addToast("Bitte zwei unterschiedliche Spieler wÃ¤hlen", "error");
+addToast("Bitte zwei unterschiedliche Spieler wählen", "error");
 
 return;
 
@@ -1346,7 +1346,7 @@ const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.groups) return;
 
-if (!confirm("Alle Gruppenergebnisse lÃ¶schen?")) return;
+if (!confirm("Alle Gruppenergebnisse löschen?")) return;
 
 
 const newGroups = currentBracket.groups.map(g => ({
@@ -1359,7 +1359,7 @@ matches: g.matches.map(m => ({ ...m, score: '', winner: null }))
 
 updateSingleBracket(activeBracketAge, { ...currentBracket, groups: newGroups }, activeBracketLevel);
 
-addToast("Ergebnisse gelÃ¶scht");
+addToast("Ergebnisse gelöscht");
 
 };
 
@@ -1474,7 +1474,7 @@ const currentBracket = activeBracket || brackets[activeBracketAge];
 
 if (!currentBracket || !currentBracket.groups) {
 
-addToast("Keine Gruppenphase fÃ¼r diese Altersklasse vorhanden", "error");
+addToast("Keine Gruppenphase für diese Altersklasse vorhanden", "error");
 
 return;
 
@@ -1486,7 +1486,7 @@ return;
 
 triggerConfirm(
 
-"KO-Phase aus den aktuellen TabellenstÃ¤nden generieren? Die Gruppenansicht wird Ã¼berschrieben.",
+"KO-Phase aus den aktuellen Tabellenständen generieren? Die Gruppenansicht wird überschrieben.",
 
 () => {
 
@@ -1540,9 +1540,9 @@ qualifiers.push(p1, p2);
 
 
 
-// Falls noch zweite Ã¼brig sind (z.B. Gruppen mit nur 1 Qualifizierten),
+// Falls noch zweite übrig sind (z.B. Gruppen mit nur 1 Qualifizierten),
 
-// hÃ¤ngen wir sie hinten dran -> ggf. Freilos im Baum.
+// hängen wir sie hinten dran -> ggf. Freilos im Baum.
 
 seconds.forEach(sec => {
 
@@ -1564,7 +1564,7 @@ if (p) qualifiers.push(p);
 
 if (qualifiers.length < 2) {
 
-addToast("Zu wenige Spieler fÃ¼r eine KO-Phase", "error");
+addToast("Zu wenige Spieler für eine KO-Phase", "error");
 
 closeConfirm();
 
@@ -1941,7 +1941,7 @@ addToast('Admin Account erstellt');
 
 const handleDeleteAdmin = (id: string) => {
 
-if (!confirm("Diesen Admin Account lÃ¶schen?")) return;
+if (!confirm("Diesen Admin Account löschen?")) return;
 
 updateAdmins(admins.filter(a => a.id !== id));
 
@@ -2038,7 +2038,7 @@ closeConfirm();
 
 const deletePlayer = (id: string) => {
 
-triggerConfirm("Spieler und ALLE seine Ergebnisse lÃ¶schen?", () => {
+triggerConfirm("Spieler und ALLE seine Ergebnisse löschen?", () => {
 
 updatePlayers(players.filter(p => p.id !== id));
 
@@ -2046,7 +2046,7 @@ const cleanResults = results.filter(r => r.playerId !== id);
 
 updateResults(cleanResults);
 
-addToast('Spieler gelÃ¶scht', 'info');
+addToast('Spieler gelöscht', 'info');
 
 closeConfirm();
 
@@ -2190,7 +2190,7 @@ updateTournaments(updatedTournaments);
 
 setNewRoundName(''); setNewRoundDate(''); setAddingRoundToTournamentId(null);
 
-addToast('Spieltag hinzugefÃ¼gt');
+addToast('Spieltag hinzugefügt');
 
 };
 
@@ -2198,7 +2198,7 @@ addToast('Spieltag hinzugefÃ¼gt');
 
 const deleteRound = (tournamentId: string, roundId: string) => {
 
-triggerConfirm("Spieltag wirklich lÃ¶schen?", () => {
+triggerConfirm("Spieltag wirklich löschen?", () => {
 
 const updatedTournaments = tournaments.map(t => {
 
@@ -2214,7 +2214,7 @@ return t;
 
 updateTournaments(updatedTournaments);
 
-addToast('Spieltag gelÃ¶scht', 'info');
+addToast('Spieltag gelöscht', 'info');
 
 closeConfirm();
 
@@ -2229,7 +2229,7 @@ const deleteTournament = (id: string) => {
 if (!isAdmin) return;
 
 
-triggerConfirm("Turnier und ALLE Ergebnisse endgÃ¼ltig lÃ¶schen?", () => {
+triggerConfirm("Turnier und ALLE Ergebnisse endgültig löschen?", () => {
 
 const newResults = results.filter(r => r.tournamentId !== id);
 
@@ -2241,7 +2241,7 @@ updateTournaments(newTournaments);
 
 if (selectedTournamentId === id) setSelectedTournamentId('');
 
-addToast('Turnier gelÃ¶scht', 'info');
+addToast('Turnier gelöscht', 'info');
 
 closeConfirm();
 
@@ -2423,7 +2423,7 @@ newTournaments.push(testTourn);
 
 
 
-// 2. Spieler - Angepasste Jahre fÃ¼r 2025
+// 2. Spieler - Angepasste Jahre für 2025
 
 const ageTemplates = [
 
@@ -2679,7 +2679,7 @@ const deleteTestData = () => {
 if (!isAdmin) return;
 
 
-triggerConfirm("Wirklich alle Testdaten lÃ¶schen?", () => {
+triggerConfirm("Wirklich alle Testdaten löschen?", () => {
 
 const cleanPlayers = players.filter(p => !p.isTestData);
 
@@ -2696,7 +2696,7 @@ updateTournaments(cleanTournaments);
 updateResults(cleanResults);
 
 
-addToast('Testdaten vollstÃ¤ndig bereinigt', 'success');
+addToast('Testdaten vollständig bereinigt', 'success');
 
 closeConfirm();
 
@@ -2714,7 +2714,7 @@ let data = players.map(player => {
 
 let totalPoints = 0;
 
-let hasPlayedInScope = false; // Flag fÃ¼r Teilnahme
+let hasPlayedInScope = false; // Flag für Teilnahme
 
 const details: any[] = [];
 
@@ -2770,15 +2770,15 @@ const aggregateRounds = rankingRoundScope === 'all' && tourn.rounds && tourn.rou
 
 if (aggregateRounds) {
 
-let aggregatedPoints = 0;
+  let aggregatedPoints = 0;
 
-let totalWins = 0;
+  let totalWins = 0;
 
-let totalCL = 0;
+  let totalCL = 0;
 
-let totalMatches = 0;
+  let totalMatches = 0;
 
-
+  let participationCount = 0;
 
 tourn.rounds.forEach(round => {
 
@@ -2789,22 +2789,14 @@ if (matchesInRound.length === 0) return;
 const roundLevel = getMatchLevel(matchesInRound[0], player.level || null);
 
 
-// Teilnahme bestÃ¤tigt (hat Matches in einer Runde dieses Turniers)
+// Teilnahme bestätigt (hat Matches in einer Runde dieses Turniers)
 
 hasPlayedInScope = true;
 participationCount++;
 
 
 
-const roundParticipants = players.filter(p => {
-
-if (calculateAgeGroup(p) !== ageGroup) return false;
-
-const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
-
-return r?.matches.some(m => m.roundId === round.id);
-
-}).length;
+// Hinweis: roundParticipants wird nicht verwendet, daher entfernt
 
 
 
@@ -2907,11 +2899,11 @@ rankingRoundScope === 'all' || m.roundId === rankingRoundScope
 
 if (matchesInScope.length > 0) {
 
-hasPlayedInScope = true; // Hat Matches im gewÃ¤hlten Filter
+hasPlayedInScope = true; // Hat Matches im gewählten Filter
 
 } else {
 
-return; // Keine Matches im Scope -> weiter zum nÃ¤chsten Turnier
+return; // Keine Matches im Scope -> weiter zum nächsten Turnier
 
 }
 
@@ -2988,7 +2980,7 @@ return {
 
 })
 
-// FILTER: Nur Spieler anzeigen, die im Scope gespielt haben (auÃŸer bei Gesamtansicht, da zeigen wir alle mit Punkten > 0 oder wenn sie Ã¼berhaupt mal gespielt haben)
+// FILTER: Nur Spieler anzeigen, die im Scope gespielt haben (außer bei Gesamtansicht, da zeigen wir alle mit Punkten > 0 oder wenn sie überhaupt mal gespielt haben)
 
 .filter(p => {
 
@@ -3198,7 +3190,7 @@ return (
 
 <span>{formatAgeGroupLabel(calculateAgeGroup(viewingPlayer))}</span>
 
-<span>â€¢</span>
+<span>•</span>
 
 {renderLevelBadge(viewingPlayer.level)}
 
@@ -3490,7 +3482,7 @@ onChange={(e) => setH2hSearch(e.target.value)}
 
 <select className="w-full p-2 border rounded text-sm mb-4" value={h2hOpponentId} onChange={(e) => setH2hOpponentId(e.target.value)}>
 
-<option value="">-- Gegner wÃ¤hlen --</option>
+<option value="">-- Gegner wählen --</option>
 
 {h2hPlayers.map(p => (
 
@@ -3565,7 +3557,7 @@ return (
 
 <AlertCircle size={24}/>
 
-<h3 className="text-lg font-bold">BestÃ¤tigung</h3>
+<h3 className="text-lg font-bold">Bestätigung</h3>
 
 </div>
 
@@ -3575,7 +3567,7 @@ return (
 
 <button onClick={closeConfirm} className="px-4 py-2 text-slate-500 font-medium hover:bg-slate-100 rounded-lg">Abbrechen</button>
 
-<button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausfÃ¼hren</button>
+<button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausführen</button>
 
 </div>
 
@@ -3728,7 +3720,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
 
-<ClipboardList size={18} /> {isAdmin ? 'Spieler HinzufÃ¼gen' : 'Anmeldung'}
+<ClipboardList size={18} /> {isAdmin ? 'Spieler Hinzufügen' : 'Anmeldung'}
 
 </button>
 
@@ -3907,7 +3899,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 {paginatedData.length === 0 ? (
 
-<tr><td colSpan={5} className="p-8 text-center text-slate-400">Keine Spieler gefunden {rankingScope !== 'overall' ? 'fÃ¼r diesen Zeitraum' : ''}.</td></tr>
+<tr><td colSpan={5} className="p-8 text-center text-slate-400">Keine Spieler gefunden {rankingScope !== 'overall' ? 'für diesen Zeitraum' : ''}.</td></tr>
 
 ) : (
 
@@ -3951,7 +3943,7 @@ return (
 
 <div className="text-[10px] text-slate-400 mt-1">
 
-{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teilnahme â€¢ ` : ''}
+{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teilnahme • ` : ''}
 
 {player.details[0]?.stats}
 
@@ -3982,7 +3974,7 @@ return (
 
 <div className="text-xs text-slate-500">
 
-Seite {currentPage} von {Math.max(1, totalPages)} â€¢ {rankingData.length} Spieler
+Seite {currentPage} von {Math.max(1, totalPages)} • {rankingData.length} Spieler
 
 </div>
 
@@ -4026,7 +4018,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 {isAdmin && activeBracket && (
 
-<button onClick={() => updateSingleBracket(activeBracketAge, null, activeBracketLevel)} className="text-red-500 text-sm hover:underline">Aktuellen Plan lÃ¶schen</button>
+<button onClick={() => updateSingleBracket(activeBracketAge, null, activeBracketLevel)} className="text-red-500 text-sm hover:underline">Aktuellen Plan löschen</button>
 
 )}
 
@@ -4094,7 +4086,7 @@ isAdmin ? (
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase block mb-1">GrÃ¶ÃŸe</label>
+<label className="text-xs font-bold text-slate-500 uppercase block mb-1">Größe</label>
 
 <select value={bracketSize} onChange={(e) => setBracketSize(parseInt(e.target.value))} className="p-2 border rounded w-32 text-sm">
 
@@ -4164,7 +4156,7 @@ isAdmin ? (
 
 <div className="text-center p-12 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
 
-Kein aktives Turnier fÃ¼r {activeBracketAge}.
+Kein aktives Turnier für {activeBracketAge}.
 
 </div>
 
@@ -4353,7 +4345,7 @@ value=""
 
 <button onClick={clearGroupResults} className="text-xs bg-red-50 px-3 py-1 rounded hover:bg-red-100 text-red-500 flex items-center gap-1">
 
-<Trash2 size={12}/> Ergebnisse lÃ¶schen
+<Trash2 size={12}/> Ergebnisse löschen
 
 </button>
 
@@ -4397,7 +4389,7 @@ return (
 
 <th className="pb-1 text-center">S:N</th>
 
-<th className="pb-1 text-center">SÃ¤tze</th>
+<th className="pb-1 text-center">Sätze</th>
 
 <th className="pb-1 text-right">Pkt</th>
 
@@ -4738,7 +4730,7 @@ onChange={e => setTeamSearch1(e.target.value)}
 
 <select className="w-full p-2 border rounded" value={teamMember1} onChange={e => setTeamMember1(e.target.value)}>
 
-<option value="">Spieler 1 wÃ¤hlen</option>
+<option value="">Spieler 1 wählen</option>
 
 {players.filter(p => !p.isTeam).filter(p => !teamSearch1 || p.name.toLowerCase().includes(teamSearch1.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
 
@@ -4766,7 +4758,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <select className="w-full p-2 border rounded" value={teamMember2} onChange={e => setTeamMember2(e.target.value)}>
 
-<option value="">Spieler 2 wÃ¤hlen</option>
+<option value="">Spieler 2 wählen</option>
 
 {players.filter(p => !p.isTeam && p.id !== teamMember1).filter(p => !teamSearch2 || p.name.toLowerCase().includes(teamSearch2.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
 
@@ -4877,7 +4869,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 </div>
 
-<h2 className="text-2xl font-bold text-slate-800 mb-2">{isAdmin ? 'Spieler direkt hinzufÃ¼gen' : 'Spieler Anmeldung'}</h2>
+<h2 className="text-2xl font-bold text-slate-800 mb-2">{isAdmin ? 'Spieler direkt hinzufügen' : 'Spieler Anmeldung'}</h2>
 
 
 {!showRegSuccess ? (
@@ -4999,7 +4991,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <button onClick={handleRegistration} disabled={!regName || !regBirthDate} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl mt-4 transition shadow-xl shadow-emerald-100">
 
-{isAdmin ? 'HinzufÃ¼gen' : 'Anmelden'}
+{isAdmin ? 'Hinzufügen' : 'Anmelden'}
 
 </button>
 
@@ -5013,7 +5005,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <h3 className="text-xl font-bold text-green-700">Erledigt!</h3>
 
-<button onClick={() => setShowRegSuccess(false)} className="mt-8 text-emerald-600 font-bold hover:underline">ZurÃ¼ck</button>
+<button onClick={() => setShowRegSuccess(false)} className="mt-8 text-emerald-600 font-bold hover:underline">Zurück</button>
 
 </div>
 
@@ -5058,7 +5050,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className="flex-1 p-2.5 border rounded-lg bg-slate-50">
 
-<option value="">-- Turnierserie wÃ¤hlen --</option>
+<option value="">-- Turnierserie wählen --</option>
 
 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
 
@@ -5076,7 +5068,7 @@ disabled={!selectedTournamentId}
 
 >
 
-<option value="">-- Spieltag / Runde wÃ¤hlen --</option>
+<option value="">-- Spieltag / Runde wählen --</option>
 
 {tournaments.find(t => t.id === selectedTournamentId)?.rounds.map(r => (
 
@@ -5088,7 +5080,7 @@ disabled={!selectedTournamentId}
 
 </div>
 
-{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswÃ¤hlen!</p>}
+{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswählen!</p>}
 
 </div>
 
@@ -5101,7 +5093,7 @@ disabled={!selectedTournamentId}
 
 <div className="flex justify-between items-center mb-2">
 
-<span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Filter size={12}/> Filter fÃ¼r Auswahl</span>
+<span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Filter size={12}/> Filter für Auswahl</span>
 
 </div>
 
@@ -5152,7 +5144,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50">
 
-<option value="">-- WÃ¤hlen --</option>
+<option value="">-- Wählen --</option>
 
 {players
 
@@ -5175,7 +5167,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase">Gegner wÃ¤hlen</label>
+<label className="text-xs font-bold text-slate-500 uppercase">Gegner wählen</label>
 
 <input
 
@@ -5193,7 +5185,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50 focus:bg-white transition">
 
-<option value="">-- Gegner wÃ¤hlen --</option>
+<option value="">-- Gegner wählen --</option>
 
 {players
 
@@ -5246,7 +5238,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 </div>
 
-<button onClick={addSet} className="mt-3 text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline"><Plus size={14}/> Weiteren Satz hinzufÃ¼gen</button>
+<button onClick={addSet} className="mt-3 text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline"><Plus size={14}/> Weiteren Satz hinzufügen</button>
 
 </div>
 
@@ -5299,7 +5291,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <input type="text" placeholder="Passwort" className="bg-slate-700 border-none rounded p-2 text-sm text-white" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}/>
 
-<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">HinzufÃ¼gen</button>
+<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">Hinzufügen</button>
 
 </div>
 
@@ -5408,7 +5400,7 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 {isGenerating ? <Loader2 className="animate-spin text-slate-400" size={16}/> : (
 
-<button onClick={() => deleteTournament(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Turnier & Ergebnisse lÃ¶schen"><Trash2 size={16}/></button>
+<button onClick={() => deleteTournament(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Turnier & Ergebnisse löschen"><Trash2 size={16}/></button>
 
 )}
 
@@ -5446,7 +5438,7 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 ) : (
 
-<button onClick={() => setAddingRoundToTournamentId(t.id)} className="ml-6 text-xs text-emerald-600 hover:underline flex items-center gap-1 mt-2"><PlusCircle size={12}/> Spieltag hinzufÃ¼gen</button>
+<button onClick={() => setAddingRoundToTournamentId(t.id)} className="ml-6 text-xs text-emerald-600 hover:underline flex items-center gap-1 mt-2"><PlusCircle size={12}/> Spieltag hinzufügen</button>
 
 )}
 
@@ -5547,7 +5539,7 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 
 <button onClick={deleteTestData} disabled={isGenerating} className="bg-white border border-red-200 text-red-500 hover:bg-red-50 disabled:bg-slate-50 disabled:text-slate-300 text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2">
 
-<Trash2 size={16}/> Alles lÃ¶schen
+<Trash2 size={16}/> Alles löschen
 
 </button>
 
