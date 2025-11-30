@@ -915,8 +915,9 @@ const displayAgeGroup = (g: AgeGroup | 'All') => g === 'All' ? 'Alle Altersklass
 const renderLevelBadge = (level?: Level | null, size: 'sm' | 'md' = 'md') => {
   if (!level) return null;
   const sizeClasses = size === 'sm' ? 'text-[11px] px-2 py-0.5' : 'text-xs px-2.5 py-1';
+  const levelColor = level === 'C' && darkMode ? 'bg-emerald-900 text-emerald-300 border border-emerald-700' : LEVEL_COLORS[level];
   return (
-    <span className={`inline-flex items-center font-semibold rounded-full ${LEVEL_COLORS[level]} ${sizeClasses}`}>
+    <span className={`inline-flex items-center font-semibold rounded-full ${levelColor} ${sizeClasses}`}>
       Level {level}
     </span>
   );
@@ -3393,7 +3394,7 @@ return (
 
 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
 
-<div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl animate-in zoom-in-95">
+<div className={`rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 transition-colors ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
 
 <div className="bg-slate-800 text-white p-6 sticky top-0 z-10">
 
@@ -3442,7 +3443,7 @@ return (
 
 {isAdmin && (
 
-<div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 mb-4">
+<div className={`border rounded-lg p-4 mb-4 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-emerald-50 border-emerald-100'}`}>
 
 <div className="grid md:grid-cols-2 gap-3">
 
@@ -3450,7 +3451,7 @@ return (
 
 <label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Leistungsklasse</label>
 
-<select value={editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value as Level)} className="w-full p-2 border rounded bg-white text-sm">
+<select value={editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value as Level)} className={`w-full p-2 border rounded text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 
 <option value="A">{LEVEL_LABELS.A}</option>
 
@@ -3466,7 +3467,7 @@ return (
 
 <label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Altersklasse (manuell)</label>
 
-<select value={editPlayerAgeGroup} onChange={e => setEditPlayerAgeGroup(e.target.value as AgeGroup | 'auto')} className="w-full p-2 border rounded bg-white text-sm">
+<select value={editPlayerAgeGroup} onChange={e => setEditPlayerAgeGroup(e.target.value as AgeGroup | 'auto')} className={`w-full p-2 border rounded text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 
 <option value="auto">Automatisch ({formatAgeGroupLabel(calculateAgeGroup(viewingPlayer.birthDate))})</option>
 
@@ -3484,7 +3485,7 @@ return (
 
 <label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Verein</label>
 
-<input type="text" value={editPlayerClub} onChange={e => setEditPlayerClub(e.target.value)} className="w-full p-2 border rounded bg-white text-sm" placeholder="Optional eintragen"/>
+<input type="text" value={editPlayerClub} onChange={e => setEditPlayerClub(e.target.value)} className={`w-full p-2 border rounded text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-500'}`} placeholder="Optional eintragen"/>
 
 </div>
 
@@ -3492,7 +3493,7 @@ return (
 
 <label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>E-Mail</label>
 
-<input type="email" value={editPlayerEmail} onChange={e => setEditPlayerEmail(e.target.value)} className="w-full p-2 border rounded bg-white text-sm" placeholder="Optional eintragen"/>
+<input type="email" value={editPlayerEmail} onChange={e => setEditPlayerEmail(e.target.value)} className={`w-full p-2 border rounded text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-500'}`} placeholder="Optional eintragen"/>
 
 </div>
 
@@ -3553,7 +3554,7 @@ const isEditing = editingMatchId === m.id;
 
 return (
 
-<div key={m.id} className="p-3 flex justify-between items-center hover:bg-slate-50">
+<div key={m.id} className={`p-3 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
 
 <div className="flex-1">
 
@@ -3587,13 +3588,13 @@ value={editScoreInput}
 
 onChange={(e) => setEditScoreInput(e.target.value)}
 
-className="border rounded p-1 text-xs w-32 font-mono"
+className={`border rounded p-1 text-xs w-32 font-mono transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}
 
 />
 
-<button onClick={() => saveEdit(m)} className="text-green-600 hover:bg-green-50 p-1 rounded"><Check size={16}/></button>
+<button onClick={() => saveEdit(m)} className={`p-1 rounded transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-green-50'} text-green-600`}><Check size={16}/></button>
 
-<button onClick={() => setEditingMatchId(null)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={16}/></button>
+<button onClick={() => setEditingMatchId(null)} className={`p-1 rounded transition-colors ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-red-50'} text-red-500`}><X size={16}/></button>
 
 </div>
 
@@ -3681,11 +3682,11 @@ ${m.isWin ? 'bg-green-500' : m.isCloseLoss ? 'bg-orange-400' : 'bg-red-400'}
 
 </div>
 
-<div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+<div className={`p-4 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-emerald-50 border-emerald-200'}`}>
 
-<div className="text-xs text-emerald-600 uppercase font-bold mb-2 flex items-center gap-1"><Trophy size={14}/> Teilnahmen</div>
+<div className={`text-xs uppercase font-bold mb-2 flex items-center gap-1 ${darkMode ? 'text-slate-300' : 'text-emerald-600'}`}><Trophy size={14}/> Teilnahmen</div>
 
-<div className="text-xl font-bold text-emerald-700">
+<div className={`text-xl font-bold ${darkMode ? 'text-slate-100' : 'text-emerald-700'}`}>
 
 {playerResults.length}
 
@@ -3699,7 +3700,7 @@ ${m.isWin ? 'bg-green-500' : m.isCloseLoss ? 'bg-orange-400' : 'bg-red-400'}
 
 
 
-<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+<div className={`p-4 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
 <div className={`text-xs uppercase font-bold mb-4 flex items-center gap-1 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}><BarChart3 size={14}/> Head-to-Head (Direktvergleich)</div>
 
@@ -3709,7 +3710,7 @@ type="text"
 
 placeholder="Gegner suchen..."
 
-className="w-full p-2 border rounded text-xs mb-2"
+className={`w-full p-2 border rounded text-xs mb-2 transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 value={h2hSearch}
 
@@ -3788,7 +3789,7 @@ return (
 
 <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in">
 
-<div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in zoom-in-95">
+<div className={`rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in zoom-in-95 transition-colors ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
 
 <div className="flex items-center gap-3 mb-4 text-red-600">
 
@@ -4004,7 +4005,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <div className="space-y-6 animate-in fade-in">
 
-<div className="flex flex-col xl:flex-row xl:flex-wrap gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 items-stretch xl:items-center">
+<div className={`flex flex-col xl:flex-row xl:flex-wrap gap-4 p-4 rounded-xl border items-stretch xl:items-center transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
 
 
 <div className="flex flex-col gap-3 w-full md:w-auto">
@@ -4013,7 +4014,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <LayoutList className="text-slate-400" size={20}/>
 
-<div className="bg-white border border-slate-200 rounded-lg flex overflow-hidden">
+<div className={`border rounded-lg flex overflow-hidden transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-slate-200'}`}>
 <button
 onClick={() => setRankingViewMode('overall')}
 className={`px-4 py-2 text-sm font-bold transition ${rankingViewMode === 'overall' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
@@ -4035,7 +4036,7 @@ Turnier
 <select
 value={rankingTournamentSelection}
 onChange={(e) => { setRankingTournamentSelection(e.target.value); setRankingRoundScope('all'); }}
-className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none w-full md:w-auto"
+className={`bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm transition-colors ${darkMode ? 'text-slate-100 bg-slate-700 border-slate-600' : 'text-slate-700 bg-white border-slate-200'}`}
 >
 <option value="">-- Turnier wählen --</option>
 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -4045,7 +4046,7 @@ className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-sl
 value={rankingRoundScope}
 onChange={(e) => setRankingRoundScope(e.target.value)}
 disabled={!rankingTournamentSelection}
-className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none w-full disabled:bg-slate-100 disabled:text-slate-400"
+className={`px-4 py-1.5 text-xs transition-colors ${darkMode ? 'text-slate-100 bg-slate-700 border-slate-600' : 'text-slate-600 bg-white border-slate-200'}`}
 >
 <option value="all">Alle Spieltage</option>
 {tournaments.find(t => t.id === rankingScope)?.rounds.map(r => (
@@ -4061,21 +4062,21 @@ className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-
 
 <div className="relative w-full xl:w-80 xl:flex-1">
 
-<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+<Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${darkMode ? 'text-slate-500' : 'text-slate-400'}`} size={16} />
 
-<input type="text" placeholder="Spieler suchen..." value={rankingSearchQuery} onChange={(e) => setRankingSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+<input type="text" placeholder="Spieler suchen..." value={rankingSearchQuery} onChange={(e) => setRankingSearchQuery(e.target.value)} className={`w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-200 placeholder-slate-600'}`} />
 
 </div>
 
 
 
 <div className="w-full xl:w-auto flex gap-2">
-<select value={rankingAgeGroup} onChange={e => setRankingAgeGroup(e.target.value)} className="flex-1 p-2 border rounded-lg bg-white text-sm">
+<select value={rankingAgeGroup} onChange={e => setRankingAgeGroup(e.target.value)} className={`flex-1 p-2 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 {getSortedAgeGroups().map(group => (
 <option key={group} value={group}>{displayAgeGroup(group)}</option>
 ))}
 </select>
-<select value={rankingLevelFilter} onChange={e => setRankingLevelFilter(e.target.value as Level | 'All')} className="w-32 min-w-[8rem] p-2 border rounded-lg bg-white text-sm">
+<select value={rankingLevelFilter} onChange={e => setRankingLevelFilter(e.target.value as Level | 'All')} className={`w-32 min-w-[8rem] p-2 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 <option value="All">Alle Level</option>
 <option value="A">{LEVEL_LABELS.A}</option>
 <option value="B">{LEVEL_LABELS.B}</option>
@@ -4100,9 +4101,9 @@ className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-
 
 {showPointsInfo && (
 
-<div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-slate-700 animate-in fade-in slide-in-from-top-2">
+<div className={`p-4 rounded-xl border text-sm animate-in fade-in slide-in-from-top-2 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-200' : 'bg-blue-50 border-blue-100 text-slate-700'}`}>
 
-<h4 className="font-bold mb-2 text-blue-800">Fair-Play Punktesystem:</h4>
+<h4 className={`font-bold mb-2 ${darkMode ? 'text-slate-100' : 'text-blue-800'}`}>Fair-Play Punktesystem:</h4>
 
 <ul className="list-disc pl-5 space-y-1">
 
@@ -4123,13 +4124,13 @@ className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-
 
 
 
-<div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+<div className={`rounded-xl border shadow-sm overflow-hidden flex flex-col transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
 <div className="overflow-x-auto">
 
 <table className="w-full text-left">
 
-<thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold tracking-wider">
+<thead className={`text-xs uppercase font-bold tracking-wider transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-500'}`}>
 
 <tr>
 
@@ -4161,7 +4162,7 @@ const realRank = (currentPage - 1) * ITEMS_PER_PAGE + idx + 1;
 
 return (
 
-<tr key={player.id} onClick={() => setViewingPlayer(player)} className="hover:bg-slate-50 cursor-pointer transition group">
+<tr key={player.id} onClick={() => setViewingPlayer(player)} className={`cursor-pointer transition group ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
 
 <td className="p-4 text-center">
 
@@ -4222,7 +4223,7 @@ return (
 
 {rankingData.length > 0 && (
 
-<div className="bg-slate-50 border-t border-slate-200 p-4 flex justify-between items-center">
+<div className={`border-t p-4 flex justify-between items-center transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
 <div className="text-xs text-slate-500">
 
@@ -4232,9 +4233,9 @@ Seite {currentPage} von {Math.max(1, totalPages)} • {rankingData.length} Spiel
 
 <div className="flex gap-2">
 
-<button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="p-2 bg-white border rounded hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white"><ChevronLeft size={16}/></button>
+<button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className={`p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600 disabled:hover:bg-slate-700' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100 disabled:hover:bg-white'}`} disabled:opacity-50><ChevronLeft size={16}/></button>
 
-<button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage >= totalPages} className="p-2 bg-white border rounded hover:bg-slate-100 disabled:opacity-50 disabled:hover:bg-white"><ChevronRight size={16}/></button>
+<button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage >= totalPages} className={`p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600 disabled:hover:bg-slate-700' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100 disabled:hover:bg-white'}`} disabled:opacity-50><ChevronRight size={16}/></button>
 
 </div>
 
@@ -4256,7 +4257,7 @@ Seite {currentPage} von {Math.max(1, totalPages)} • {rankingData.length} Spiel
 
 <div className="animate-in fade-in space-y-4">
 
-<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+<div className={`rounded-xl shadow-sm border p-6 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
 <div className="flex justify-between items-center mb-6">
 
@@ -4279,7 +4280,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 <div className="grid md:grid-cols-2 gap-3 mb-4">
 <div>
 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Altersklasse</label>
-<select value={activeBracketAge} onChange={(e) => setActiveBracketAge(e.target.value as AgeGroup)} className="w-full p-2 border rounded bg-slate-50">
+<select value={activeBracketAge} onChange={(e) => setActiveBracketAge(e.target.value as AgeGroup)} className={`w-full p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'}`}>
 {getSortedAgeGroups().filter(g => g !== "All").map(g => (
 <option key={g} value={g}>{displayAgeGroup(g)}</option>
 ))}
@@ -4287,7 +4288,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 </div>
 <div>
 <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Leistungsklasse</label>
-<select value={activeBracketLevel} onChange={(e) => setActiveBracketLevel(e.target.value as Level)} className="w-full p-2 border rounded bg-slate-50">
+<select value={activeBracketLevel} onChange={(e) => setActiveBracketLevel(e.target.value as Level)} className={`w-full p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'}`}>
 <option value="A">{LEVEL_LABELS.A}</option>
 <option value="B">{LEVEL_LABELS.B}</option>
 <option value="C">{LEVEL_LABELS.C}</option>
@@ -4302,7 +4303,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 isAdmin ? (
 
-<div className="flex flex-col md:flex-row gap-4 items-end bg-slate-50 p-4 rounded-lg border border-slate-100">
+<div className={`flex flex-col md:flex-row gap-4 items-end p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
 
 <div>
 
@@ -4406,7 +4407,7 @@ isAdmin ? (
 
 ) : (
 
-<div className="text-center p-12 text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+<div className={`text-center p-12 rounded-lg border border-dashed transition-colors ${darkMode ? 'text-slate-500 bg-slate-900 border-slate-700' : 'text-slate-400 bg-slate-50 border-slate-200'}`}>
 
 Kein aktives Turnier für {activeBracketAge}.
 
@@ -4434,13 +4435,11 @@ activeBracket.type === 'ko' && activeBracket.rounds ? (
 
 {/* Match Box */}
 
-<div className="w-48 bg-white border rounded-lg shadow-sm overflow-hidden text-sm relative z-10">
-
-{/* Player 1 Slot */}
+                    <div className={`w-48 border rounded-lg shadow-sm overflow-hidden text-sm relative z-10 transition-colors ${darkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>{/* Player 1 Slot */}
 
 <div
 
-className={`p-2 border-b flex justify-between items-center cursor-pointer hover:bg-slate-50 ${match.winner?.id === match.p1?.id && match.winner ? 'bg-green-50' : ''}`}
+className={`p-2 border-b flex justify-between items-center cursor-pointer transition-colors ${darkMode ? `hover:bg-slate-700 ${match.winner?.id === match.p1?.id && match.winner ? 'bg-emerald-900' : ''}` : `hover:bg-slate-50 ${match.winner?.id === match.p1?.id && match.winner ? 'bg-green-50' : ''}`}`}
 
 onClick={() => match.p1 && isAdmin && advanceBracket(rIndex, mIndex, match.p1)}
 
@@ -4456,7 +4455,7 @@ isAdmin ? (
 
 <select
 
-className="w-full text-xs p-1 bg-slate-50 border rounded"
+className={`w-full text-xs p-1 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}
 
 onChange={(e) => setBracketPlayer(rIndex, mIndex, 'p1', e.target.value)}
 
@@ -4487,7 +4486,7 @@ value=""
 
 <div
 
-className={`p-2 flex justify-between items-center cursor-pointer hover:bg-slate-50 ${match.winner?.id === match.p2?.id && match.winner ? 'bg-green-50' : ''}`}
+className={`p-2 flex justify-between items-center cursor-pointer transition-colors ${darkMode ? `hover:bg-slate-700 ${match.winner?.id === match.p2?.id && match.winner ? 'bg-emerald-900' : ''}` : `hover:bg-slate-50 ${match.winner?.id === match.p2?.id && match.winner ? 'bg-green-50' : ''}`}`}
 
 onClick={() => match.p2 && isAdmin && advanceBracket(rIndex, mIndex, match.p2)}
 
@@ -4503,7 +4502,7 @@ isAdmin ? (
 
 <select
 
-className="w-full text-xs p-1 bg-slate-50 border rounded"
+className={`w-full text-xs p-1 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}
 
 onChange={(e) => setBracketPlayer(rIndex, mIndex, 'p2', e.target.value)}
 
@@ -4561,7 +4560,7 @@ value=""
 
 <div className="flex flex-col justify-around">
 
-<div className="w-32 h-32 border-2 border-dashed border-emerald-200 rounded-full flex flex-col items-center justify-center text-emerald-600 bg-emerald-50">
+<div className={`w-32 h-32 border-2 border-dashed rounded-full flex flex-col items-center justify-center transition-colors ${darkMode ? 'border-emerald-800 text-emerald-400 bg-emerald-950' : 'border-emerald-200 text-emerald-600 bg-emerald-50'}`}>
 
 <Trophy size={32} className="mb-2"/>
 
@@ -4595,7 +4594,7 @@ value=""
 
 </button>
 
-<button onClick={clearGroupResults} className="text-xs bg-red-50 px-3 py-1 rounded hover:bg-red-100 text-red-500 flex items-center gap-1">
+<button onClick={clearGroupResults} className={`text-xs px-3 py-1 rounded flex items-center gap-1 font-bold transition-colors ${darkMode ? 'bg-red-900 text-red-300 hover:bg-red-800' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}>
 
 <Trash2 size={12}/> Ergebnisse löschen
 
@@ -4620,14 +4619,14 @@ const standings = calculateGroupStandings(group);
 
 return (
 
-<div key={gIndex} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+<div key={gIndex} className={`rounded-xl overflow-hidden shadow-sm border transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
 <div className="bg-slate-100 p-2 font-bold text-slate-700 text-center border-b border-slate-200">{group.name}</div>
 
 
 {/* STANDINGS TABLE */}
 
-<div className="bg-slate-50 p-2 border-b border-slate-200">
+<div className={`p-2 border-b transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
 <table className="w-full text-xs text-left">
 
@@ -4683,9 +4682,7 @@ return (
 
 {group.matches.map((m, mIndex) => (
 
-<div key={m.id} className="p-2 flex justify-between items-center bg-white hover:bg-slate-50">
-
-<div className="text-xs">
+            <div key={m.id} className={`p-2 flex justify-between items-center transition-colors ${darkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-white hover:bg-slate-50'}`}><div className="text-xs">
 
 <div className={m.winner?.id === m.p1.id ? 'font-bold text-green-700' : ''}>{m.p1.name}</div>
 
@@ -4701,7 +4698,7 @@ type="text"
 
 placeholder="6:4 6:2"
 
-className="w-16 text-[10px] p-1 border rounded text-right font-mono"
+className={`w-16 text-[10px] p-1 border rounded text-right font-mono transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 value={m.score}
 
@@ -4740,11 +4737,11 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {activeTab === 'planner' && (
 <div className="animate-in fade-in space-y-6">
 
-<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
+<div className={`rounded-xl shadow-sm border p-6 flex flex-col gap-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 <div className="flex flex-col gap-4">
 <div>
-<h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Calendar className="text-emerald-600" size={18}/> Spielplan nach Turniertag & Alters-/Leistungsklasse</h2>
-<p className="text-sm text-slate-600">Wähle einen Turniertag und lose pro Level aus. Der Spielmodus kann für jede Gruppe einzeln festgelegt werden.</p>
+<h2 className={`text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-emerald-600" size={18}/> Spielplan nach Turniertag & Alters-/Leistungsklasse</h2>
+<p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Wähle einen Turniertag und lose pro Level aus. Der Spielmodus kann für jede Gruppe einzeln festgelegt werden.</p>
 </div>
 <div className="flex flex-col gap-3 w-full">
 <div className="grid md:grid-cols-2 gap-3">
@@ -4816,10 +4813,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 </div>
 
 {isAdmin && (
-  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-5">
+  <div className={`border rounded-xl p-6 space-y-5 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-200'}`}>
     <div className="flex items-center gap-2 mb-4">
-      <UserPlus size={20} className="text-blue-600"/>
-      <h3 className="text-base font-bold text-slate-800">Spieler hinzufügen</h3>
+      <UserPlus size={20} className={darkMode ? 'text-slate-400' : 'text-blue-600'}/>
+      <h3 className={`text-base font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Spieler hinzufügen</h3>
     </div>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
       <div className="lg:col-span-2">
@@ -4828,7 +4825,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           <select
             value={plannerFilterAgeGroup}
             onChange={e => setPlannerFilterAgeGroup(e.target.value as AgeGroup | 'All')}
-            className="p-2 border border-blue-300 dark:border-blue-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`p-2 border rounded-lg text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
           >
             <option value="All">Alle Alter</option>
             {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
@@ -4838,7 +4835,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           <select
             value={plannerFilterLevel}
             onChange={e => setPlannerFilterLevel(e.target.value as Level | 'All')}
-            className="p-2 border border-blue-300 dark:border-blue-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`p-2 border rounded-lg text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
           >
             <option value="All">Alle Level</option>
             <option value="A">{LEVEL_LABELS.A}</option>
@@ -4851,12 +4848,12 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           value={plannerPlayerSearch}
           onChange={e => setPlannerPlayerSearch(e.target.value)}
           placeholder="Suche..."
-          className="w-full mb-2 p-2 text-sm border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full mb-2 p-2 text-sm border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
         />
         <select
           value={plannerSelectedPlayerId}
           onChange={e => setPlannerSelectedPlayerId(e.target.value)}
-          className="w-full p-3.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
         >
           <option value="">-- Wählen --</option>
           {players
@@ -4876,7 +4873,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       </div>
       <div>
         <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Ziel-Altersklasse</label>
-        <select value={plannerTargetAgeGroup} onChange={e => setPlannerTargetAgeGroup(e.target.value as AgeGroup)} className="w-full p-3.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <select value={plannerTargetAgeGroup} onChange={e => setPlannerTargetAgeGroup(e.target.value as AgeGroup)} className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
           {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
             <option key={g} value={g}>{displayAgeGroup(g)}</option>
           ))}
@@ -4884,7 +4881,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       </div>
       <div>
         <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Level</label>
-        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className="w-full p-3.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
           <option value="A">{LEVEL_LABELS.A}</option>
           <option value="B">{LEVEL_LABELS.B}</option>
           <option value="C">{LEVEL_LABELS.C}</option>
@@ -4898,15 +4895,15 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 )}
 
 {showTournamentField && (
-<div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-  <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><CalendarDays size={16}/> Turniertage</h4>
+<div className={`rounded-xl shadow-sm border p-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+  <h4 className={`text-sm font-bold mb-2 flex items-center gap-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}><CalendarDays size={16}/> Turniertage</h4>
   {tournaments.length === 0 ? (
-    <p className="text-slate-500 text-center py-6">Keine Turniere angelegt.</p>
+    <p className={`text-center py-6 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Keine Turniere angelegt.</p>
   ) : (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
       {tournaments.map(t => (
-        <div key={t.id} className="border border-slate-200 rounded-lg p-3">
-          <div className="font-bold text-slate-800">{t.name}</div>
+        <div key={t.id} className={`border rounded-lg p-3 transition-colors ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+          <div className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{t.name}</div>
           <div className="text-xs text-slate-500 mb-2">{t.date}</div>
           {t.rounds && t.rounds.length > 0 ? (
             <ul className="text-xs text-slate-600 space-y-1">
@@ -4938,7 +4935,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   const currentMode = groupMatchModes[groupKey] || 'auto';
 
   return (
-    <div key={level} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+    <div key={level} className={`rounded-xl shadow-sm border p-6 space-y-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
       <div className="flex justify-between items-start gap-3">
         <div className="flex-1">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -4952,7 +4949,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             <select
               value={currentMode}
               onChange={e => setGroupMatchModes(prev => ({ ...prev, [groupKey]: e.target.value as 'auto' | 'single' | 'double' }))}
-              className="p-2 border border-slate-300 rounded text-xs bg-white"
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100' : 'bg-white text-slate-900'}"
             >
               <option value="auto">Automatisch</option>
               <option value="single">1x gegen jeden</option>
@@ -4991,13 +4988,13 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               <input
                 type="text"
                 placeholder="Spieler suchen..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 dark:text-slate-100 dark:placeholder-slate-400 outline-none"
+                className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors ${darkMode ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-600'}`}
                 value=""
                 onChange={() => {}}
               />
             </div>
             <select
-              className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 dark:text-slate-100 outline-none min-w-[180px]"
+              className={`px-4 py-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors min-w-[180px] ${darkMode ? 'bg-slate-800 border-slate-600 text-slate-100' : 'bg-white border-slate-300 text-slate-900'}`}
             >
               <option value="all">Alle Spieler</option>
               {stats.map(s => (
@@ -5021,7 +5018,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               {stats.length === 0 ? (
                 <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Noch keine Spieler in diesem Level.</td></tr>
               ) : stats.map(s => (
-                <tr key={s.player.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition" onClick={() => setViewingPlayer(s.player)}>
+                <tr key={s.player.id} className={`cursor-pointer transition ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`} onClick={() => setViewingPlayer(s.player)}>
                   <td className="px-4 py-3.5 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">{s.player.name}</td>
                   <td className="px-4 py-3.5 text-slate-500 dark:text-slate-400 text-sm">{s.player.club || '-'}</td>
                   <td className="px-4 py-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">{s.participationPoints}</td>
@@ -5034,10 +5031,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             </tbody>
           </table>
         </div>
-        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+        <div className={`border rounded-xl p-4 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex justify-between items-center mb-4">
             <span className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">Auslosung</span>
-            <span className="text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 px-2 py-1 rounded">{fixtures.length} geplant</span>
+            <span className={`text-xs px-2 py-1 rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-400' : 'bg-white text-slate-500'}`}>{fixtures.length} geplant</span>
           </div>
           {fixtures.length === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">Noch keine Auslosung.</p>
@@ -5045,12 +5042,12 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             <>
             <div className="space-y-4 mb-4">
               {paginatedFixtures.map(f => (
-                <div key={f.id} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-4 shadow-sm hover:shadow-md transition">
-                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
+            <div key={f.id} className={`rounded-lg border p-4 shadow-sm hover:shadow-md transition ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                  <div className={`flex justify-between text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     <span className="font-medium">Runde {f.round}</span>
-                    <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{LEVEL_LABELS[level]}</span>
+                    <span className={`px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>{LEVEL_LABELS[level]}</span>
                   </div>
-                  <div className="font-bold text-slate-800 dark:text-slate-100 mb-3 text-base">
+                  <div className={`font-bold mb-3 text-base ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
                     <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p1Id) || null)}>{resolveName(f.p1Id)}</span>
                     {' '}<span className="text-slate-400 dark:text-slate-500 mx-2">vs</span>{' '}
                     <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p2Id) || null)}>{resolveName(f.p2Id)}</span>
@@ -5070,13 +5067,13 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                     // Wenn gespeichert und nicht im Bearbeitungsmodus
                     if (savedMatch && !isEditing) {
                       return (
-                        <div className="flex items-center gap-2 bg-green-50 px-2 py-1 rounded">
-                          <span className="text-xs font-mono font-bold text-green-700">{savedMatch.score}</span>
+                        <div className={`flex items-center gap-2 px-2 py-1 rounded transition-colors ${darkMode ? 'bg-emerald-900' : 'bg-green-50'}`}>
+                          <span className={`text-xs font-mono font-bold ${darkMode ? 'text-emerald-300' : 'text-green-700'}`}>{savedMatch.score}</span>
                           <div className="ml-auto flex gap-1">
                             <button onClick={() => {
                               setEditingFixtures(prev => ({ ...prev, [f.id]: true }));
                               setPlannerScoreInput(prev => ({ ...prev, [f.id]: savedMatch.score }));
-                            }} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Bearbeiten">
+                            }} className={`p-1 rounded transition-colors ${darkMode ? 'text-blue-400 hover:bg-slate-700' : 'text-blue-600 hover:bg-blue-100'}`} title="Bearbeiten">
                               <Edit2 size={12}/>
                             </button>
                             <button onClick={() => {
@@ -5096,13 +5093,13 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       <input
                         type="text"
                         placeholder="z.B. 6:4 4:6 10:8"
-                        className="w-full p-2 border rounded text-xs"
+                        className={`w-full p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
                         value={scoreStr}
                         onChange={e => setPlannerScoreInput(prev => ({ ...prev, [f.id]: e.target.value }))}
                       />
                       {scoreStr && result && (
-                        <div className="text-[10px] text-slate-600 bg-blue-50 px-2 py-1 rounded">
-                          💡 {resolveName(f.p1Id)}: <b className="text-emerald-700">{p1Points.toFixed(1)}P</b> • {resolveName(f.p2Id)}: <b className="text-emerald-700">{p2Points.toFixed(1)}P</b>
+                        <div className={`text-[10px] px-2 py-1 rounded transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-blue-50 text-slate-600'}`}>
+                          💡 {resolveName(f.p1Id)}: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p1Points.toFixed(1)}P</b> • {resolveName(f.p2Id)}: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p2Points.toFixed(1)}P</b>
                         </div>
                       )}
                       <div className="flex gap-2 items-center justify-between">
@@ -5128,17 +5125,17 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 <button
                   onClick={() => setPlannerCurrentPage(Math.max(1, currentFixturePage - 1))}
                   disabled={currentFixturePage === 1}
-                  className="px-2 py-1 text-xs bg-white border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                  className={`px-2 py-1 text-xs border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'}`}
                 >
                   ←
                 </button>
-                <span className="text-xs text-slate-600">
+                <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   Seite {currentFixturePage} von {totalFixturePages}
                 </span>
                 <button
                   onClick={() => setPlannerCurrentPage(Math.min(totalFixturePages, currentFixturePage + 1))}
                   disabled={currentFixturePage === totalFixturePages}
-                  className="px-2 py-1 text-xs bg-white border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100"
+                  className={`px-2 py-1 text-xs border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'}`}
                 >
                   →
                 </button>
@@ -5163,19 +5160,19 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
 <div className="space-y-6 animate-in fade-in">
 
-<div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+<div className={`flex flex-col md:flex-row gap-4 justify-between p-4 rounded-xl border shadow-sm transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
 <div className="relative w-full md:w-64">
 
 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
 
-<input type="text" placeholder="Name suchen..." value={playersListSearch} onChange={(e) => setPlayersListSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+<input type="text" placeholder="Name suchen..." value={playersListSearch} onChange={(e) => setPlayersListSearch(e.target.value)} className={`w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-slate-50 text-slate-900 border-slate-200 placeholder-slate-600'}`} />
 
 </div>
 
 <div className="flex gap-2">
 
-<select value={playersListAgeFilter} onChange={(e) => setPlayersListAgeFilter(e.target.value)} className="p-2 border rounded-lg bg-slate-50 text-sm">
+<select value={playersListAgeFilter} onChange={(e) => setPlayersListAgeFilter(e.target.value)} className={`p-2 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 text-slate-900 border-slate-300'}`}>
 
 <option value="All">Alle Altersklassen</option>
 
@@ -5201,9 +5198,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
 {isCreatingTeam && (
 
-<div className="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-4 animate-in slide-in-from-top-2">
+<div className={`p-4 rounded-xl border mb-4 animate-in slide-in-from-top-2 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-100'}`}>
 
-<h4 className="font-bold text-blue-800 mb-3">Neues Doppel-Team erstellen</h4>
+<h4 className={`font-bold mb-3 ${darkMode ? 'text-blue-300' : 'text-blue-800'}`}>Neues Doppel-Team erstellen</h4>
 
 <div className="flex flex-col md:flex-row gap-4 items-center">
 
@@ -5215,7 +5212,7 @@ type="text"
 
 placeholder="Suche Spieler 1..."
 
-className="w-full p-2 border rounded text-xs mb-1"
+className={`w-full p-2 border rounded text-xs mb-1 transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 value={teamSearch1}
 
@@ -5243,7 +5240,7 @@ type="text"
 
 placeholder="Suche Spieler 2..."
 
-className="w-full p-2 border rounded text-xs mb-1"
+className={`w-full p-2 border rounded text-xs mb-1 transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 value={teamSearch2}
 
@@ -5271,11 +5268,11 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 
 
-<div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+<div className={`rounded-xl border shadow-sm overflow-hidden transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
 <table className="w-full text-left">
 
-<thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold tracking-wider">
+<thead className={`text-xs uppercase font-bold tracking-wider transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-500'}`}>
 
 <tr>
 
@@ -5297,7 +5294,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 {filteredPlayersList.map(p => (
 
-<tr key={p.id} onClick={() => setViewingPlayer(p)} className="hover:bg-slate-50 cursor-pointer group">
+<tr key={p.id} onClick={() => setViewingPlayer(p)} className={`cursor-pointer group transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
 
 <td className="p-4 font-bold text-slate-700 flex items-center gap-2">
 
@@ -5313,7 +5310,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <td className="p-4 text-xs">
 
-{p.isTestData ? <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">Testdaten</span> : <span className="bg-green-100 text-green-700 px-2 py-1 rounded">Registriert</span>}
+{p.isTestData ? <span className={`px-2 py-1 rounded transition-colors ${darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>Testdaten</span> : <span className={`px-2 py-1 rounded transition-colors ${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700'}`}>Registriert</span>}
 
 </td>
 
@@ -5351,15 +5348,15 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <div className="max-w-xl mx-auto animate-in fade-in">
 
-<div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-lg text-center">
+<div className={`rounded-2xl p-8 shadow-lg text-center border transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
-<div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+<div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors ${darkMode ? 'bg-emerald-950' : 'bg-emerald-100'}`}>
 
-<UserPlus className="text-emerald-600 w-8 h-8" />
+<UserPlus className={`w-8 h-8 ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
 
 </div>
 
-<h2 className="text-2xl font-bold text-slate-800 mb-2">{isAdmin ? 'Spieler direkt hinzufügen' : 'Spieler Anmeldung'}</h2>
+<h2 className={`text-2xl font-bold mb-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{isAdmin ? 'Spieler direkt hinzufügen' : 'Spieler Anmeldung'}</h2>
 
 
 {!showRegSuccess ? (
@@ -5370,7 +5367,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vor- & Nachname</label>
 
-<input type="text" value={regName} onChange={e => setRegName(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="Max Mustermann"/>
+<input type="text" value={regName} onChange={e => setRegName(e.target.value)} className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`} placeholder="Max Mustermann"/>
 
 </div>
 
@@ -5378,7 +5375,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Verein (optional)</label>
 
-<input type="text" value={regClub} onChange={e => setRegClub(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="TC Musterstadt"/>
+<input type="text" value={regClub} onChange={e => setRegClub(e.target.value)} className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`} placeholder="TC Musterstadt"/>
 
 </div>
 
@@ -5386,7 +5383,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail (optional)</label>
 
-<input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="max@example.com"/>
+<input type="email" value={regEmail} onChange={e => setRegEmail(e.target.value)} className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`} placeholder="max@example.com"/>
 
 </div>
 
@@ -5394,12 +5391,12 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geburtsdatum</label>
 
-<input type="date" value={regBirthDate} onChange={e => setRegBirthDate(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"/>
+<input type="date" value={regBirthDate} onChange={e => setRegBirthDate(e.target.value)} className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}/>
 
 <div className="text-xs text-slate-500 mt-1">Altersklasse (automatisch): <span className="font-bold text-emerald-600">{regPreviewAge}</span> – anhand des Geburtsdatums</div>
 
 {isAdmin && (
-<div className="bg-slate-50 border border-dashed border-emerald-200 rounded-lg p-3 mt-2">
+<div className={`border border-dashed rounded-lg p-3 mt-2 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-emerald-200'}`}>
 <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase">
 <span>Manuelle Zuordnung</span>
 <button
@@ -5424,7 +5421,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 <select
  value={regManualAgeGroup || regAutoAgeGroup || 'Yellow'}
  onChange={e => setRegManualAgeGroup(e.target.value as AgeGroup)}
- className="mt-2 w-full p-2 border rounded bg-white text-sm"
+ className={`mt-2 w-full p-2 border rounded text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}
 >
  {AGE_GROUP_ORDER.map(group => (
    <option key={group} value={group}>{displayAgeGroup(group)}</option>
@@ -5442,7 +5439,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Niveau</label>
 
-<select value={regLevel} onChange={(e) => setRegLevel(e.target.value as Level)} className="w-full p-3 border rounded-lg bg-white">
+<select value={regLevel} onChange={(e) => setRegLevel(e.target.value as Level)} className={`w-full p-3 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 
 <option value="A">{LEVEL_LABELS.A}</option>
 
@@ -5460,7 +5457,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Wunsch-Turnier</label>
 
-<select value={regTournamentId} onChange={(e) => setRegTournamentId(e.target.value)} className="w-full p-3 border rounded-lg bg-white">
+<select value={regTournamentId} onChange={(e) => setRegTournamentId(e.target.value)} className={`w-full p-3 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 
 <option value="">-- Kein spezifisches Turnier --</option>
 
@@ -5475,7 +5472,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 {regTournamentId && (
 
-<div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+<div className={`p-3 rounded-lg border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">An welchen Tagen?</label>
 
@@ -5517,32 +5514,32 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 
 
-<button onClick={handleRegistration} disabled={!regName || !regBirthDate} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl mt-4 transition shadow-xl shadow-emerald-100">
+<button onClick={handleRegistration} disabled={!regName || !regBirthDate} className={`w-full font-bold py-4 rounded-xl mt-4 transition shadow-xl text-white disabled:bg-slate-300 ${darkMode ? 'bg-emerald-700 hover:bg-emerald-600 shadow-emerald-950' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100'}`}>
 
 {isAdmin ? 'Hinzufügen' : 'Anmelden'}
 
 </button>
 
 {isAdmin && (
-<div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
+<div className={`mt-6 p-4 rounded-xl border text-sm transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 <div className="flex flex-wrap items-center gap-2 justify-between mb-3">
 <h3 className="font-bold text-slate-700 flex items-center gap-2"><Users size={16}/> Bestehende Spieler</h3>
 <span className="text-xs text-slate-500">{registrationPlayersPreview.length} Spieler</span>
 </div>
 <div className="flex flex-wrap gap-2 mb-3">
-<select value={regPlayersAgeFilter} onChange={e => setRegPlayersAgeFilter(e.target.value as AgeGroup | 'All')} className="flex-1 min-w-[120px] p-2 border rounded text-xs bg-white">
+<select value={regPlayersAgeFilter} onChange={e => setRegPlayersAgeFilter(e.target.value as AgeGroup | 'All')} className={`flex-1 min-w-[120px] p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 <option value="All">Alle Altersklassen</option>
 {AGE_GROUP_ORDER.map(group => <option key={group} value={group}>{displayAgeGroup(group)}</option>)}
 </select>
-<select value={regPlayersLevelFilter} onChange={e => setRegPlayersLevelFilter(e.target.value as Level | 'All')} className="flex-1 min-w-[120px] p-2 border rounded text-xs bg-white">
+<select value={regPlayersLevelFilter} onChange={e => setRegPlayersLevelFilter(e.target.value as Level | 'All')} className={`flex-1 min-w-[120px] p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 <option value="All">Alle Level</option>
 <option value="A">{LEVEL_LABELS.A}</option>
 <option value="B">{LEVEL_LABELS.B}</option>
 <option value="C">{LEVEL_LABELS.C}</option>
 </select>
-<input type="text" value={regPlayersSearch} onChange={e => setRegPlayersSearch(e.target.value)} className="flex-1 min-w-[160px] p-2 border rounded text-xs bg-white" placeholder="Spieler suchen..."/>
+<input type="text" value={regPlayersSearch} onChange={e => setRegPlayersSearch(e.target.value)} className={`flex-1 min-w-[160px] p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`} placeholder="Spieler suchen..."/>
 </div>
-<div className="max-h-64 overflow-y-auto divide-y divide-slate-200 bg-white rounded-lg border border-slate-100">
+<div className={`max-h-64 overflow-y-auto divide-y rounded-lg border transition-colors ${darkMode ? 'divide-slate-700 bg-slate-800 border-slate-700' : 'divide-slate-200 bg-white border-slate-200'}`}>
 {registrationPlayersPreview.length === 0 ? (
 <div className="p-4 text-center text-xs text-slate-400">Keine Spieler gefunden.</div>
 ) : registrationPlayersPreview.map(p => (
@@ -5586,13 +5583,13 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in">
 
-<div className="bg-white border border-emerald-100 rounded-xl shadow-lg shadow-emerald-50 overflow-hidden">
+<div className={`border rounded-xl shadow-lg overflow-hidden transition-colors ${darkMode ? 'bg-slate-900 border-slate-700 shadow-slate-950' : 'bg-white border-emerald-100 shadow-emerald-50'}`}>
 
-<div className="bg-emerald-50 p-4 border-b border-emerald-100 flex items-center gap-2">
+<div className={`p-4 border-b flex items-center gap-2 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-emerald-50 border-emerald-100'}`}>
 
-<PlayCircle className="text-emerald-600" />
+<PlayCircle className={darkMode ? 'text-emerald-400' : 'text-emerald-600'} />
 
-<h2 className="font-bold text-emerald-900">Ergebnis erfassen</h2>
+<h2 className={`font-bold ${darkMode ? 'text-slate-200' : 'text-emerald-900'}`}>Ergebnis erfassen</h2>
 
 </div>
 
@@ -5609,7 +5606,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <div className="flex gap-2 mt-1">
 
-<select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className="flex-1 p-2.5 border rounded-lg bg-slate-50">
+<select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className={`flex-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}>
 
 <option value="">-- Turnierserie wählen --</option>
 
@@ -5650,7 +5647,7 @@ disabled={!selectedTournamentId}
 
 {/* Filtering & Search for Input */}
 
-<div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-2">
+<div className={`p-3 rounded-lg border mb-2 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
 <div className="flex justify-between items-center mb-2">
 
@@ -5668,7 +5665,7 @@ disabled={!selectedTournamentId}
 
 </select>
 
-<select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className="text-xs p-1.5 border rounded bg-white">
+<select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className={`text-xs p-1.5 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 <option value="race4">Zählweise: bis 4</option>
 <option value="race10">Zählweise: bis 10</option>
 <option value="race15">Zählweise: bis 15</option>
@@ -5699,7 +5696,7 @@ value={inputPlayerSearch}
 
 onChange={e => setInputPlayerSearch(e.target.value)}
 
-className="w-full mb-1 p-1 text-xs border rounded"
+className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 />
 
@@ -5740,7 +5737,7 @@ value={inputOpponentSearch}
 
 onChange={e => setInputOpponentSearch(e.target.value)}
 
-className="w-full mb-1 p-1 text-xs border rounded"
+className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 />
 
@@ -5773,7 +5770,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 
 
-<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+<div className={`p-4 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Spielstand</label>
 
@@ -5785,11 +5782,11 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <span className="text-xs font-bold text-slate-400 w-12">Satz {idx+1}</span>
 
-<input type="number" min="0" placeholder="6" className="w-16 p-2 text-center border rounded font-bold" value={set.p1} onChange={(e) => updateSet(idx, 'p1', e.target.value)} />
+<input type="number" min="0" placeholder="6" className={`w-16 p-2 text-center border rounded font-bold transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`} value={set.p1} onChange={(e) => updateSet(idx, 'p1', e.target.value)} />
 
 <span className="text-slate-400">:</span>
 
-<input type="number" min="0" placeholder="4" className="w-16 p-2 text-center border rounded font-bold" value={set.p2} onChange={(e) => updateSet(idx, 'p2', e.target.value)} />
+<input type="number" min="0" placeholder="4" className={`w-16 p-2 text-center border rounded font-bold transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`} value={set.p2} onChange={(e) => updateSet(idx, 'p2', e.target.value)} />
 
 {sets.length > 1 && <button onClick={() => removeSet(idx)} className="text-slate-300 hover:text-red-500 ml-2"><X size={16}/></button>}
 
@@ -5858,7 +5855,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 {admins.map(a => (
 
-<div key={a.id} className="bg-white/10 p-2 rounded flex justify-between items-center text-sm">
+<div key={a.id} className={`p-2 rounded flex justify-between items-center text-sm transition-colors ${darkMode ? 'bg-slate-700' : 'bg-white/10'}`}>
 
 <span>{a.username} {a.isSuperAdmin && <span className="text-xs text-emerald-400 ml-2">(Super Admin)</span>}</span>
 
@@ -5877,19 +5874,19 @@ className="w-full mb-1 p-1 text-xs border rounded"
 </div>
 
 {/* THEME-AUSWAHL */}
-<div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+<div className={`rounded-xl shadow-sm border p-6 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+  <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
     <Sun size={20} className="text-purple-600"/> Darstellung
   </h3>
   <div className="flex items-center gap-4">
-    <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">Theme:</span>
+    <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Theme:</span>
     <div className="flex gap-2">
       <button
         onClick={() => setTheme('light')}
         className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
           theme === 'light'
-            ? 'bg-emerald-100 text-emerald-800 shadow-sm font-medium'
-            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+            ? `${darkMode ? 'bg-emerald-900 text-emerald-300 shadow-sm font-medium' : 'bg-emerald-100 text-emerald-800 shadow-sm font-medium'}`
+            : `${darkMode ? 'bg-slate-700 text-slate-400 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
         }`}
       >
         <Sun size={18} className={theme === 'light' ? 'text-yellow-500' : ''} />
@@ -5912,16 +5909,16 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 {/* EINSTELLUNGEN */}
 
-<div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+<div className={`p-6 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
 
-<h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Settings className="text-blue-500"/> Einstellungen</h3>
+<h3 className={`font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Settings className="text-blue-500"/> Einstellungen</h3>
 
 <div className="space-y-4">
 
-<div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+<div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
   <div>
-    <div className="font-medium text-slate-800">Turniertage im Spielplan anzeigen</div>
-    <div className="text-xs text-slate-500 mt-1">Zeigt die Liste der Turniere und Spieltage im Spielplan-Tab an</div>
+    <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Turniertage im Spielplan anzeigen</div>
+    <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Zeigt die Liste der Turniere und Spieltage im Spielplan-Tab an</div>
   </div>
   <label className="relative inline-flex items-center cursor-pointer">
     <input
@@ -5934,10 +5931,10 @@ className="w-full mb-1 p-1 text-xs border rounded"
   </label>
 </div>
 
-<div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200">
+<div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
   <div>
-    <div className="font-medium text-slate-800">Turnierbaum-Menü aktivieren</div>
-    <div className="text-xs text-slate-500 mt-1">Aktiviert das Turnier-Tab mit K.O.-System und Gruppenauslosung</div>
+    <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Turnierbaum-Menü aktivieren</div>
+    <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aktiviert das Turnier-Tab mit K.O.-System und Gruppenauslosung</div>
   </div>
   <label className="relative inline-flex items-center cursor-pointer">
     <input
@@ -5960,9 +5957,9 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 {pendingRegistrations.length > 0 && (
 
-<div className="bg-orange-50 border border-orange-100 rounded-xl p-6">
+<div className={`border rounded-xl p-6 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-orange-50 border-orange-100'}`}>
 
-<h3 className="text-lg font-bold text-orange-800 mb-4 flex items-center gap-2"><UserCheck className="text-orange-600"/> Offene Anmeldungen</h3>
+<h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-orange-800'}`}><UserCheck className={darkMode ? 'text-slate-400' : 'text-orange-600'}/> Offene Anmeldungen</h3>
 
 <div className="space-y-3">
 
@@ -5973,13 +5970,13 @@ const ageLabel = formatAgeGroupLabel(calculateAgeGroup(req.birthDate));
 
 return (
 
-<div key={req.id} className="bg-white p-4 rounded-lg shadow-sm border border-orange-100 flex justify-between items-center">
+<div key={req.id} className={`p-4 rounded-lg shadow-sm border flex justify-between items-center transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-orange-100'}`}>
 
 <div>
 
-<div className="font-bold text-slate-800">{req.name} <span className="text-slate-400 font-normal">({ageLabel})</span></div>
+<div className={`font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{req.name} <span className={`font-normal ${darkMode ? 'text-slate-400' : 'text-slate-400'}`}>({ageLabel})</span></div>
 
-<div className="text-xs text-slate-500 mt-1">
+<div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
 
 Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}` : ''} {req.email ? ` - ${req.email}` : ''} {tourName ? ` - Will zu: ${tourName}` : ''}
 
@@ -5989,7 +5986,7 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 <div className="flex gap-2">
 
-<button onClick={() => rejectRegistration(req.id)} className="p-2 text-red-400 hover:bg-red-50 rounded"><XCircle size={20}/></button>
+<button onClick={() => rejectRegistration(req.id)} className={`p-2 rounded transition-colors ${darkMode ? 'text-red-300 hover:bg-slate-700' : 'text-red-400 hover:bg-red-50'}`}><XCircle size={20}/></button>
 
 <button onClick={() => approveRegistration(req)} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded hover:bg-emerald-700 flex items-center gap-1"><CheckCircle2 size={14}/> Zulassen</button>
 
@@ -6009,15 +6006,15 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 {/* TOURNAMENTS */}
 
-<div className="bg-white p-6 rounded-xl border border-slate-200">
+<div className={`p-6 rounded-xl border transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
-<h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Calendar className="text-purple-500"/> Turnierserien</h3>
+<h3 className={`font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-purple-500"/> Turnierserien</h3>
 
 <div className="flex gap-2 mb-6">
 
-<input type="text" value={newTournamentName} onChange={e => setNewTournamentName(e.target.value)} className="flex-1 p-2 border rounded" placeholder="Neue Serie anlegen"/>
+<input type="text" value={newTournamentName} onChange={e => setNewTournamentName(e.target.value)} className={`flex-1 p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`} placeholder="Neue Serie anlegen"/>
 
-<input type="date" value={newTournamentDate} onChange={e => setNewTournamentDate(e.target.value)} className="w-32 p-2 border rounded"/>
+<input type="date" value={newTournamentDate} onChange={e => setNewTournamentDate(e.target.value)} className={`w-32 p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}/>
 
 <button onClick={handleAddTournament} className="bg-purple-600 text-white p-2 rounded"><Plus/></button>
 
@@ -6027,17 +6024,17 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 {tournaments.map(t => (
 
-<div key={t.id} className="border border-slate-200 rounded-lg overflow-hidden">
+<div key={t.id} className={`border rounded-lg overflow-hidden transition-colors ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
 
-<div className="bg-slate-50 p-3 flex justify-between items-center">
+<div className={`p-3 flex justify-between items-center transition-colors ${darkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
 
-<div className="font-bold text-slate-700 flex items-center gap-2"><CalendarDays size={16} className="text-slate-400"/>{t.name}</div>
+<div className={`font-bold flex items-center gap-2 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}><CalendarDays size={16} className="text-slate-400"/>{t.name}</div>
 
 <div className="flex items-center gap-2">
 
 {isGenerating ? <Loader2 className="animate-spin text-slate-400" size={16}/> : (
 
-<button onClick={() => deleteTournament(t.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Turnier & Ergebnisse löschen"><Trash2 size={16}/></button>
+<button onClick={() => deleteTournament(t.id)} className={`p-1.5 rounded transition-colors ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`} title="Turnier & Ergebnisse löschen"><Trash2 size={16}/></button>
 
 )}
 
@@ -6045,7 +6042,7 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 </div>
 
-<div className="p-3 bg-white space-y-2">
+<div className={`p-3 space-y-2 transition-colors ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
 
 {t.rounds.map(r => (
 
@@ -6063,9 +6060,9 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 <div className="flex gap-2 pl-6 mt-2">
 
-<input type="text" placeholder="Bezeichnung" className="flex-1 text-sm p-1 border rounded" value={newRoundName} onChange={e => setNewRoundName(e.target.value)} />
+<input type="text" placeholder="Bezeichnung" className={`flex-1 text-sm p-1 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`} value={newRoundName} onChange={e => setNewRoundName(e.target.value)} />
 
-<input type="date" className="w-28 text-sm p-1 border rounded" value={newRoundDate} onChange={e => setNewRoundDate(e.target.value)} />
+<input type="date" className={`w-28 text-sm p-1 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`} value={newRoundDate} onChange={e => setNewRoundDate(e.target.value)} />
 
 <button onClick={() => handleAddRound(t.id)} className="bg-emerald-600 text-white text-xs px-2 rounded">Save</button>
 
@@ -6093,17 +6090,17 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 {/* TEST DATA GENERATOR */}
 
-<div className="bg-slate-100 p-6 rounded-xl border border-slate-200 mt-8">
+<div className={`p-6 rounded-xl border mt-8 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
 
 <div className="flex justify-between items-center mb-4">
 
-<h3 className="font-bold text-slate-800 flex items-center gap-2"><Database className="text-blue-500"/> Massen-Testdaten</h3>
+<h3 className={`font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Database className="text-blue-500"/> Massen-Testdaten</h3>
 
-{isGenerating && <span className="text-xs text-slate-500 animate-pulse flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> {generationStatus}</span>}
+{isGenerating && <span className={`text-xs animate-pulse flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><Loader2 size={12} className="animate-spin"/> {generationStatus}</span>}
 
 </div>
 
-<p className="text-sm text-slate-500 mb-4">
+<p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
 
 Generiert lokale Testdaten.
 
@@ -6129,7 +6126,7 @@ min={2}
 
 max={10000}
 
-className="w-full p-3 border border-blue-300 rounded-lg text-sm bg-white"
+className={`w-full p-3 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-blue-300'}`}
 
 value={testPlayerCount}
 
@@ -6153,7 +6150,7 @@ type="number"
 
 min={1}
 
-className="w-full p-3 border border-blue-300 rounded-lg text-sm bg-white"
+className={`w-full p-3 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-blue-300'}`}
 
 value={testMatchesPerPlayer}
 
@@ -6174,7 +6171,7 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 
 </button>
 
-<button onClick={deleteTestData} disabled={isGenerating} className="bg-white border border-red-200 text-red-500 hover:bg-red-50 disabled:bg-slate-50 disabled:text-slate-300 text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2">
+<button onClick={deleteTestData} disabled={isGenerating} className={`border text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2 ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500' : 'bg-white border-red-200 text-red-500 hover:bg-red-50 disabled:bg-slate-50 disabled:text-slate-300'}`}>
 
 <Trash2 size={16}/> Alles löschen
 
