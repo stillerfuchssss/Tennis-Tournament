@@ -19,10 +19,11 @@ Bell, GitFork, Shuffle,  UserCog, Edit2, Check, TrendingUp,
 BarChart3, Scale, Users2, Table2, ArrowRightCircle, 
 
 } from 'lucide-react';
+
 // --- SERVER CONNECTION ---
 // Wenn wir lokal entwickeln (localhost), nutzen wir Port 3000. 
 // Auf dem echten Server (Production) nutzen wir den gleichen Pfad.
-const API_URL = import.meta.env.DEV ? 'http://localhost:3000' : '';
+const API_URL = (import.meta as any).env.DEV ? 'http://localhost:3000' : '';
 
 const apiSave = async (key: string, data: any) => {
   try {
