@@ -3448,7 +3448,7 @@ return (
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 uppercase block mb-1">Leistungsklasse</label>
+<label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Leistungsklasse</label>
 
 <select value={editPlayerLevel} onChange={e => setEditPlayerLevel(e.target.value as Level)} className="w-full p-2 border rounded bg-white text-sm">
 
@@ -3464,7 +3464,7 @@ return (
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 uppercase block mb-1">Altersklasse (manuell)</label>
+<label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Altersklasse (manuell)</label>
 
 <select value={editPlayerAgeGroup} onChange={e => setEditPlayerAgeGroup(e.target.value as AgeGroup | 'auto')} className="w-full p-2 border rounded bg-white text-sm">
 
@@ -3482,7 +3482,7 @@ return (
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 uppercase block mb-1">Verein</label>
+<label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Verein</label>
 
 <input type="text" value={editPlayerClub} onChange={e => setEditPlayerClub(e.target.value)} className="w-full p-2 border rounded bg-white text-sm" placeholder="Optional eintragen"/>
 
@@ -3490,7 +3490,7 @@ return (
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 uppercase block mb-1">E-Mail</label>
+<label className={`text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>E-Mail</label>
 
 <input type="email" value={editPlayerEmail} onChange={e => setEditPlayerEmail(e.target.value)} className="w-full p-2 border rounded bg-white text-sm" placeholder="Optional eintragen"/>
 
@@ -3528,11 +3528,11 @@ return (
 
 <div key={t.id} className="border border-slate-200 rounded-xl overflow-hidden">
 
-<div className="bg-slate-50 p-3 border-b border-slate-200 font-bold text-slate-700 flex justify-between">
+<div className={`p-3 border-b font-bold flex justify-between transition-colors ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
 
 <span>{t.name}</span>
 
-<span className="text-slate-400 text-xs font-normal">{new Date(t.date).toLocaleDateString('de-DE')}</span>
+<span className={`text-xs font-normal ${darkMode ? 'text-slate-400' : 'text-slate-400'}`}>{new Date(t.date).toLocaleDateString('de-DE')}</span>
 
 </div>
 
@@ -3643,9 +3643,9 @@ className="border rounded p-1 text-xs w-32 font-mono"
 
 <div className="grid grid-cols-3 gap-4">
 
-<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+<div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} p-4 rounded-xl border`}>
 
-<div className="text-xs text-slate-500 uppercase font-bold mb-2 flex items-center gap-1"><TrendingUp size={14}/> Formkurve</div>
+<div className={`text-xs uppercase font-bold mb-2 flex items-center gap-1 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}><TrendingUp size={14}/> Formkurve</div>
 
 <div className="flex gap-1">
 
@@ -3669,11 +3669,11 @@ ${m.isWin ? 'bg-green-500' : m.isCloseLoss ? 'bg-orange-400' : 'bg-red-400'}
 
 </div>
 
-<div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+<div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} p-4 rounded-xl border`}>
 
-<div className="text-xs text-slate-500 uppercase font-bold mb-2 flex items-center gap-1"><Scale size={14}/> Satzbilanz</div>
+<div className={`text-xs uppercase font-bold mb-2 flex items-center gap-1 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}><Scale size={14}/> Satzbilanz</div>
 
-<div className="text-xl font-bold text-slate-700">
+<div className={`text-xl font-bold ${darkMode ? 'text-slate-100' : 'text-slate-700'}`}>
 
 {totalSetsWon} : {totalSetsLost}
 
@@ -3701,7 +3701,7 @@ ${m.isWin ? 'bg-green-500' : m.isCloseLoss ? 'bg-orange-400' : 'bg-red-400'}
 
 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
 
-<div className="text-xs text-slate-500 uppercase font-bold mb-4 flex items-center gap-1"><BarChart3 size={14}/> Head-to-Head (Direktvergleich)</div>
+<div className={`text-xs uppercase font-bold mb-4 flex items-center gap-1 ${darkMode ? 'text-slate-300' : 'text-slate-500'}`}><BarChart3 size={14}/> Head-to-Head (Direktvergleich)</div>
 
 <input
 
@@ -3798,11 +3798,11 @@ return (
 
 </div>
 
-<p className="text-slate-600 mb-6">{confirmDialog.message}</p>
+<p className={`mb-6 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{confirmDialog.message}</p>
 
 <div className="flex justify-end gap-3">
 
-<button onClick={closeConfirm} className="px-4 py-2 text-slate-500 font-medium hover:bg-slate-100 rounded-lg">Abbrechen</button>
+<button onClick={closeConfirm} className={`px-4 py-2 font-medium rounded-lg transition ${darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'}`}>Abbrechen</button>
 
 <button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausführen</button>
 
@@ -4754,15 +4754,15 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       setPlannerSelectedTournamentId(e.target.value);
       const t = tournaments.find(t => t.id === e.target.value);
       if (t && t.rounds.length > 0) setPlannerSelectedRoundId(t.rounds[0].id);
-    }} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
+    }} className={`p-3 border rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
       {tournaments.map(t => (
         <option key={t.id} value={t.id}>{t.name}</option>
       ))}
     </select>
   </div>
   <div className="flex flex-col gap-2">
-    <label className="text-xs font-bold text-slate-600 uppercase">Spieltag</label>
-    <select value={plannerSelectedRoundId} onChange={e => setPlannerSelectedRoundId(e.target.value)} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
+    <label className={`text-xs font-bold uppercase ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Spieltag</label>
+    <select value={plannerSelectedRoundId} onChange={e => setPlannerSelectedRoundId(e.target.value)} className={`p-3 border rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
       {(() => {
         const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
         if (!selectedTournament || selectedTournament.rounds.length === 0) {
@@ -4798,8 +4798,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   </div>
 )}
 <div className="flex flex-col gap-2">
-<label className="text-xs font-bold text-slate-600 uppercase">Altersklasse</label>
-<select value={plannerAgeGroup} onChange={e => setPlannerAgeGroup(e.target.value as AgeGroup)} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
+<label className={`text-xs font-bold uppercase ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Altersklasse</label>
+<select value={plannerAgeGroup} onChange={e => setPlannerAgeGroup(e.target.value as AgeGroup)} className={`p-3 border rounded-lg text-sm font-medium transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
   <option key={g} value={g}>{displayAgeGroup(g)}</option>
 ))}
@@ -5703,7 +5703,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 />
 
-<select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50">
+<select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className={`w-full mt-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}>
 
 <option value="">-- Wählen --</option>
 
@@ -5744,7 +5744,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 />
 
-<select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50 focus:bg-white transition">
+<select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className={`w-full mt-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 focus:bg-slate-600' : 'bg-slate-50 border-slate-300 focus:bg-white'}`}>
 
 <option value="">-- Gegner wählen --</option>
 
