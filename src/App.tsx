@@ -6,7 +6,7 @@ Trophy, Users, Plus, Trash2, Activity,
 
 Medal, UserPlus,
 
-CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, ChevronDown, PlayCircle,
+CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, PlayCircle,
 
 Search, Calendar, Settings, Unlock, ShieldCheck,
 
@@ -16,7 +16,7 @@ PlusCircle, Database, Loader2, Info, Filter, HardDrive,
 
 Bell, GitFork, Shuffle,  UserCog, Edit2, Check, TrendingUp,
 
-BarChart3, Scale, Users2, Table2, ArrowRightCircle, 
+BarChart3, Scale, Users2, Table2, ArrowRightCircle, Sun, Moon, 
 
 } from 'lucide-react';
 
@@ -379,7 +379,18 @@ const [adminUsernameInput, setAdminUsernameInput] = useState('');
 
 const [adminPasswordInput, setAdminPasswordInput] = useState('');
 
+// Theme
+type Theme = 'light' | 'dark';
+const [theme, setTheme] = useState<Theme>(() => {
+  const saved = localStorage.getItem('theme');
+  return (saved as Theme) || 'light';
+});
 
+// Custom Group Weights
+const [customGroupWeights, setCustomGroupWeights] = useState<Record<string, number>>(() => {
+  const saved = localStorage.getItem('customGroupWeights');
+  return saved ? JSON.parse(saved) : {};
+});
 
 // Data
 
@@ -401,6 +412,12 @@ const [admins, setAdmins] = useState<AdminAccount[]>([]);
 
 
 // UI State
+
+const [darkMode, setDarkMode] = useState(() => {
+  // Load dark mode preference from localStorage
+  const saved = localStorage.getItem('darkMode');
+  return saved ? JSON.parse(saved) : false;
+});
 
 const [activeTab, setActiveTab] = useState<PlannerTab>('ranking');
 
@@ -544,6 +561,8 @@ const [plannerScoreInput, setPlannerScoreInput] = useState<Record<string, string
 const [plannerScoringMode, setPlannerScoringMode] = useState<ScoringMode>('race10');
 const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   const [plannerPlayerSearch, setPlannerPlayerSearch] = useState('');
+  const [plannerFilterAgeGroup, setPlannerFilterAgeGroup] = useState<AgeGroup | 'All'>('All');
+  const [plannerFilterLevel, setPlannerFilterLevel] = useState<Level | 'All'>('All');
   const [plannerNewLevel, setPlannerNewLevel] = useState<Level>('C');
   const [plannerTargetAgeGroup, setPlannerTargetAgeGroup] = useState<AgeGroup>('Red');
   const [plannerCurrentPage, setPlannerCurrentPage] = useState(1);
@@ -556,16 +575,21 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   const [plannerSelectedRoundId, setPlannerSelectedRoundId] = useState<string>('');
   const [groupMatchModes, setGroupMatchModes] = useState<Record<string, 'auto' | 'single' | 'double'>>({});
 
-  // Spielplan-Ansicht: Auslosung oder Tabellen
-  const [plannerView, setPlannerView] = useState<'fixtures' | 'standings'>('fixtures');
-  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
-  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
-  const [editMatchScore, setEditMatchScore] = useState<string>('');
-
   // Synchronisiere Target-Altersgruppe mit plannerAgeGroup
   useEffect(() => {
     setPlannerTargetAgeGroup(plannerAgeGroup);
   }, [plannerAgeGroup]);
+
+  // Theme persistence
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  // Custom group weights persistence
+  useEffect(() => {
+    localStorage.setItem('customGroupWeights', JSON.stringify(customGroupWeights));
+  }, [customGroupWeights]);
 
   // Initialisiere Turnier/Round Auswahl
   useEffect(() => {
@@ -577,6 +601,16 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
     }
   }, [tournaments, plannerSelectedTournamentId]);
 
+  // Dark Mode Effect
+  useEffect(() => {
+    localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    const htmlElement = document.documentElement;
+    if (darkMode) {
+      htmlElement.classList.add('dark');
+    } else {
+      htmlElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
 
 // Generator Config
@@ -890,9 +924,17 @@ const renderLevelBadge = (level?: Level | null, size: 'sm' | 'md' = 'md') => {
 
 
 
-const getGroupSizeWeight = (participantCount: number) => {
+const getGroupSizeWeight = (participantCount: number, ageGroup?: AgeGroup, level?: Level) => {
 
 if (participantCount <= 0) return 1;
+
+// Check for custom weight override
+if (ageGroup && level) {
+  const groupKey = `${ageGroup}-${level}`;
+  if (customGroupWeights[groupKey] !== undefined) {
+    return customGroupWeights[groupKey];
+  }
+}
 
 // Finde die größte Gruppe über ALLE Levels und Altersgruppen
 let maxGroupSize = 1;
@@ -945,7 +987,7 @@ const generateRoundRobin = (ids: string[], mode: 'single' | 'double') => {
 const collectPlannerStats = (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string) => {
   const eligible = players.filter(p => calculateAgeGroup(p) === age && p.level === level);
   const participantCount = eligible.length;
-  const weight = getGroupSizeWeight(participantCount);
+  const weight = getGroupSizeWeight(participantCount, age, level);
   const stats = eligible.map(p => {
     const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
     let matches = res ? res.matches.filter(m => getMatchLevel(m, p.level || null) === level) : [];
@@ -1872,7 +1914,7 @@ if (mode !== 'sets') {
     if (mode === 'race4') {
       isCloseLoss = (p2 >= 4 && p1 >= 3 && diff === 1);
     } else if (mode === 'race10') {
-      isCloseLoss = (p2 >= 10 && p1 >= 9 && diff === 1);
+      isCloseLoss = (p2 >= 10 && p1 >= 8 && diff <= 2);
     } else if (mode === 'race15') {
       isCloseLoss = (p2 >= 15 && p1 >= 12 && diff <= 3);
     } else {
@@ -3812,7 +3854,7 @@ ${toast.type === 'success' ? 'bg-emerald-600 text-white' : toast.type === 'error
 
 return (
 
-<div className="min-h-screen bg-slate-50 font-sans text-slate-800 p-2 md:p-6 pb-24 md:pb-6 relative">
+<div className={`min-h-screen font-sans transition-colors duration-300 p-2 md:p-6 pb-24 md:pb-6 relative ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
 
 <PlayerDetailModal />
 
@@ -3822,7 +3864,7 @@ return (
 
 
 
-<div className="max-w-6xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden border border-slate-200">
+<div className={`max-w-6xl mx-auto shadow-xl rounded-2xl overflow-hidden border transition-colors duration-300 ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
 
 {/* HEADER */}
@@ -3854,6 +3896,12 @@ Tennis Turnier Manager
 
 
 <div className="flex items-center gap-2 bg-white/10 p-2 rounded-lg backdrop-blur-sm w-full md:w-auto">
+
+<button onClick={() => setDarkMode(!darkMode)} className="p-2 hover:bg-white/20 rounded-lg transition">
+
+{darkMode ? <Sun size={20} /> : <Moon size={20} />}
+
+</button>
 
 {!isAdmin ? (
 
@@ -3887,35 +3935,35 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 {/* NAVIGATION */}
 
-<div className="flex border-b border-slate-200 overflow-x-auto bg-white sticky top-0 z-10 scrollbar-hide">
+<div className={`flex border-b overflow-x-auto sticky top-0 z-10 scrollbar-hide transition-colors duration-300 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'}`}>
 
-<button onClick={() => setActiveTab('ranking')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'ranking' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('ranking')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'ranking' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <Medal size={18} /> Rangliste
 
 </button>
 
 {enableTournamentMenu && (
-<button onClick={() => setActiveTab('bracket')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'bracket' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('bracket')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'bracket' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 </button>
 )}
 
-<button onClick={() => setActiveTab('planner')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'planner' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('planner')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'planner' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <Calendar className="text-emerald-600" size={18}/> Spielplan
 
 </button>
 
-<button onClick={() => setActiveTab('players')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'players' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('players')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'players' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <Users size={18} /> Spieler
 
 </button>
 
-<button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <ClipboardList size={18} /> {isAdmin ? 'Spieler Hinzufügen' : 'Anmeldung'}
 
@@ -3925,13 +3973,13 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <>
 
-<button onClick={() => setActiveTab('input')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'input' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('input')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'input' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <Activity size={18} /> Eingabe
 
 </button>
 
-<button onClick={() => setActiveTab('admin')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'admin' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
+<button onClick={() => setActiveTab('admin')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'admin' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <Settings size={18} /> Verwaltung {pendingRegistrations.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">{pendingRegistrations.length}</span>}
 
@@ -4728,33 +4776,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   </div>
 </div>
 
-{/* View Toggle: Auslosung oder Tabellen */}
-<div className="flex gap-2 bg-slate-100 p-1 rounded-lg">
-  <button
-    onClick={() => setPlannerView('fixtures')}
-    className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition ${
-      plannerView === 'fixtures'
-        ? 'bg-white text-emerald-700 shadow-sm'
-        : 'text-slate-600 hover:text-slate-800'
-    }`}
-  >
-    <Shuffle size={16} className="inline mr-2"/>
-    Auslosung
-  </button>
-  <button
-    onClick={() => setPlannerView('standings')}
-    className={`flex-1 py-2 px-4 rounded-md font-medium text-sm transition ${
-      plannerView === 'standings'
-        ? 'bg-white text-blue-700 shadow-sm'
-        : 'text-slate-600 hover:text-slate-800'
-    }`}
-  >
-    <Trophy size={16} className="inline mr-2"/>
-    Tabellen
-  </button>
-</div>
-
-{plannerView === 'fixtures' && (() => {
+{(() => {
   const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
   const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
 
@@ -4793,76 +4815,83 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 })()}
 </div>
 
-{plannerView === 'fixtures' && isAdmin && (
+{isAdmin && (
   <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-5">
     <div className="flex items-center gap-2 mb-4">
       <UserPlus size={20} className="text-blue-600"/>
       <h3 className="text-base font-bold text-slate-800">Spieler hinzufügen</h3>
     </div>
-    <div className="grid md:grid-cols-6 gap-4 items-end">
-      <div className="md:col-span-2">
-        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Spieler (Suche)</label>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
+      <div className="lg:col-span-2">
+        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Spieler wählen</label>
+        <div className="flex gap-2 mb-2">
+          <select
+            value={plannerFilterAgeGroup}
+            onChange={e => setPlannerFilterAgeGroup(e.target.value as AgeGroup | 'All')}
+            className="p-2 border border-blue-300 dark:border-blue-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="All">Alle Alter</option>
+            {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
+              <option key={g} value={g}>{displayAgeGroup(g)}</option>
+            ))}
+          </select>
+          <select
+            value={plannerFilterLevel}
+            onChange={e => setPlannerFilterLevel(e.target.value as Level | 'All')}
+            className="p-2 border border-blue-300 dark:border-blue-600 rounded-lg text-xs bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="All">Alle Level</option>
+            <option value="A">{LEVEL_LABELS.A}</option>
+            <option value="B">{LEVEL_LABELS.B}</option>
+            <option value="C">{LEVEL_LABELS.C}</option>
+          </select>
+        </div>
         <input
           type="text"
           value={plannerPlayerSearch}
           onChange={e => setPlannerPlayerSearch(e.target.value)}
-          placeholder="Name oder Geburtsjahr eingeben..."
-          className="w-full p-3.5 border border-blue-300 rounded-lg text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+          placeholder="Suche..."
+          className="w-full mb-2 p-2 text-sm border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-slate-700 dark:text-slate-100 dark:placeholder-slate-400 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        {plannerPlayerSearch && (
-          <div className="absolute z-10 w-full mt-1 border border-blue-300 rounded-lg bg-white shadow-lg max-h-56 overflow-y-auto">
-            {players
-              .filter(p =>
-                p.name.toLowerCase().includes(plannerPlayerSearch.toLowerCase()) ||
-                p.birthDate.includes(plannerPlayerSearch)
-              )
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .slice(0, 10)
-              .map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setPlannerSelectedPlayerId(p.id);
-                    setPlannerPlayerSearch('');
-                  }}
-                  className="w-full text-left px-4 py-2 hover:bg-blue-100 text-sm border-b border-slate-100 last:border-b-0"
-                >
-                  <div className="font-medium text-slate-800">{p.name}</div>
-                  <div className="text-xs text-slate-500">{new Date(p.birthDate).toLocaleDateString('de-DE')} • {displayAgeGroup(calculateAgeGroup(p))}</div>
-                </button>
-              ))}
-            {players.filter(p =>
-              p.name.toLowerCase().includes(plannerPlayerSearch.toLowerCase()) ||
-              p.birthDate.includes(plannerPlayerSearch)
-            ).length === 0 && (
-              <div className="px-4 py-2 text-sm text-slate-500">Keine Spieler gefunden</div>
-            )}
-          </div>
-        )}
-        {plannerSelectedPlayerId && (
-          <div className="text-xs text-slate-600 bg-blue-100 px-3 py-2 rounded-lg">
-            ✓ {players.find(p => p.id === plannerSelectedPlayerId)?.name}
-          </div>
-        )}
+        <select
+          value={plannerSelectedPlayerId}
+          onChange={e => setPlannerSelectedPlayerId(e.target.value)}
+          className="w-full p-3.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">-- Wählen --</option>
+          {players
+            .filter(p => {
+              const matchesAge = plannerFilterAgeGroup === 'All' || calculateAgeGroup(p) === plannerFilterAgeGroup;
+              const matchesLevel = plannerFilterLevel === 'All' || p.level === plannerFilterLevel;
+              const matchesSearch = !plannerPlayerSearch || p.name.toLowerCase().includes(plannerPlayerSearch.toLowerCase());
+              return matchesAge && matchesLevel && matchesSearch;
+            })
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({displayAgeGroup(calculateAgeGroup(p))}{p.level ? ` • ${LEVEL_LABELS[p.level]}` : ''})
+              </option>
+            ))}
+        </select>
       </div>
       <div>
-        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Ziel-Altersklasse</label>
-        <select value={plannerTargetAgeGroup} onChange={e => setPlannerTargetAgeGroup(e.target.value as AgeGroup)} className="w-full p-3.5 border border-blue-300 rounded-lg text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Ziel-Altersklasse</label>
+        <select value={plannerTargetAgeGroup} onChange={e => setPlannerTargetAgeGroup(e.target.value as AgeGroup)} className="w-full p-3.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
           {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
             <option key={g} value={g}>{displayAgeGroup(g)}</option>
           ))}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Level</label>
-        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className="w-full p-3.5 border border-blue-300 rounded-lg text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Level</label>
+        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className="w-full p-3.5 border border-blue-300 dark:border-blue-600 rounded-lg text-sm bg-white dark:bg-slate-700 dark:text-slate-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="A">{LEVEL_LABELS.A}</option>
           <option value="B">{LEVEL_LABELS.B}</option>
           <option value="C">{LEVEL_LABELS.C}</option>
         </select>
       </div>
       <div>
-        <button onClick={quickAddPlannerPlayer} className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"><UserPlus size={16}/> Hinzufügen</button>
+        <button onClick={quickAddPlannerPlayer} className="w-full px-4 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"><UserPlus size={16}/> Hinzufügen</button>
       </div>
     </div>
   </div>
@@ -4954,54 +4983,77 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         )}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 uppercase text-xs font-bold">
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 overflow-x-auto space-y-3">
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                placeholder="Spieler suchen..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 dark:text-slate-100 dark:placeholder-slate-400 outline-none"
+                value=""
+                onChange={() => {}}
+              />
+            </div>
+            <select
+              className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 dark:text-slate-100 outline-none min-w-[180px]"
+            >
+              <option value="all">Alle Spieler</option>
+              {stats.map(s => (
+                <option key={s.player.id} value={s.player.id}>{s.player.name}</option>
+              ))}
+            </select>
+          </div>
+          <table className="w-full text-left">
+            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-xs font-bold tracking-wide">
               <tr>
-                <th className="p-2">Name</th>
-                <th className="p-2">Verein</th>
-                <th className="p-2 text-center">Teiln.</th>
-                <th className="p-2 text-center">S</th>
-                <th className="p-2 text-center">KN</th>
-                <th className="p-2 text-center">N</th>
-                <th className="p-2 text-right">Punkte</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Verein</th>
+                <th className="px-4 py-3 text-center">Teiln.</th>
+                <th className="px-4 py-3 text-center">S</th>
+                <th className="px-4 py-3 text-center">KN</th>
+                <th className="px-4 py-3 text-center">N</th>
+                <th className="px-4 py-3 text-right">Punkte</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {stats.length === 0 ? (
-                <tr><td colSpan={7} className="p-4 text-center text-slate-400 text-sm">Noch keine Spieler in diesem Level.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Noch keine Spieler in diesem Level.</td></tr>
               ) : stats.map(s => (
-                <tr key={s.player.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setViewingPlayer(s.player)}>
-                  <td className="p-2 font-bold text-emerald-700 hover:underline">{s.player.name}</td>
-                  <td className="p-2 text-slate-500">{s.player.club || '-'}</td>
-                  <td className="p-2 text-center font-bold text-slate-700">{s.participationPoints}</td>
-                  <td className="p-2 text-center font-bold text-green-600">{s.wins}</td>
-                  <td className="p-2 text-center font-bold text-orange-500">{s.close}</td>
-                  <td className="p-2 text-center font-bold text-red-500">{s.losses}</td>
-                  <td className="p-2 text-right font-bold text-slate-800">{s.points.toFixed(1)}</td>
+                <tr key={s.player.id} className="hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition" onClick={() => setViewingPlayer(s.player)}>
+                  <td className="px-4 py-3.5 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">{s.player.name}</td>
+                  <td className="px-4 py-3.5 text-slate-500 dark:text-slate-400 text-sm">{s.player.club || '-'}</td>
+                  <td className="px-4 py-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">{s.participationPoints}</td>
+                  <td className="px-4 py-3.5 text-center font-semibold text-green-600 dark:text-green-400">{s.wins}</td>
+                  <td className="px-4 py-3.5 text-center font-semibold text-orange-600 dark:text-orange-400">{s.close}</td>
+                  <td className="px-4 py-3.5 text-center font-semibold text-red-600 dark:text-red-400">{s.losses}</td>
+                  <td className="px-4 py-3.5 text-right text-base font-bold text-slate-800 dark:text-slate-100">{s.points.toFixed(1)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold text-slate-500 uppercase">Auslosung</span>
-            <span className="text-[11px] text-slate-400">{fixtures.length} geplant</span>
+        <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wide">Auslosung</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-700 px-2 py-1 rounded">{fixtures.length} geplant</span>
           </div>
           {fixtures.length === 0 ? (
-            <p className="text-sm text-slate-500">Noch keine Auslosung.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">Noch keine Auslosung.</p>
           ) : (
             <>
-            <div className="space-y-3 mb-3">
+            <div className="space-y-4 mb-4">
               {paginatedFixtures.map(f => (
-                <div key={f.id} className="bg-white rounded border border-slate-200 px-3 py-2 text-sm">
-                  <div className="flex justify-between text-xs text-slate-500 mb-1"><span>Runde {f.round}</span><span>{LEVEL_LABELS[level]}</span></div>
-                  <div className="font-bold text-slate-800 mb-2">
-                    <span className="text-emerald-700 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p1Id) || null)}>{resolveName(f.p1Id)}</span>
-                    {' '}<span className="text-slate-400">vs</span>{' '}
-                    <span className="text-emerald-700 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p2Id) || null)}>{resolveName(f.p2Id)}</span>
+                <div key={f.id} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-4 shadow-sm hover:shadow-md transition">
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-2">
+                    <span className="font-medium">Runde {f.round}</span>
+                    <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">{LEVEL_LABELS[level]}</span>
+                  </div>
+                  <div className="font-bold text-slate-800 dark:text-slate-100 mb-3 text-base">
+                    <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p1Id) || null)}>{resolveName(f.p1Id)}</span>
+                    {' '}<span className="text-slate-400 dark:text-slate-500 mx-2">vs</span>{' '}
+                    <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p2Id) || null)}>{resolveName(f.p2Id)}</span>
                   </div>
                   {isAdmin && (() => {
                     // Prüfe ob Match bereits gespeichert wurde
@@ -5100,202 +5152,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   );
 })}
 
-{/* TABELLEN-ANSICHT */}
-{plannerView === 'standings' && plannerSelectedTournamentId && plannerSelectedRoundId && (() => {
-  const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
-  const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
-
-  if (!selectedTournament || !selectedRound) return null;
-
-  const ageGroups = getSortedAgeGroups().filter(ag => ag !== 'All');
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-5 rounded-xl border border-blue-800 shadow-lg">
-        <div className="flex items-center gap-3 text-white">
-          <CalendarDays size={24} className="text-blue-100"/>
-          <div>
-            <div className="text-xs font-semibold text-blue-200 uppercase tracking-wide">Aktuelle Auswahl</div>
-            <div className="text-xl font-bold">{selectedTournament.name}</div>
-            <div className="text-sm text-blue-100 flex items-center gap-2 mt-1">
-              <Calendar size={14}/>
-              {selectedRound.name} - {selectedRound.date}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {ageGroups.map(ageGroup => {
-        const levels: Level[] = ['A', 'B', 'C'];
-        return levels.map(level => {
-          const groupPlayers = players.filter(p =>
-            calculateAgeGroup(p) === ageGroup && p.level === level
-          );
-          if (groupPlayers.length === 0) return null;
-
-          const standings = groupPlayers.map(player => {
-            const playerResult = results.find(r => r.playerId === player.id && r.tournamentId === selectedTournament.id);
-            if (!playerResult) return { player, points: 0, matches: 0, wins: 0, closeLosses: 0 };
-
-            const roundMatches = playerResult.matches.filter(m => m.roundId === selectedRound.id);
-            let points = 0, wins = 0, closeLosses = 0;
-
-            if (roundMatches.length > 0) points += 1;
-
-            const weight = getGroupSizeWeight(groupPlayers.length);
-            roundMatches.forEach(match => {
-              const analysis = analyzeSingleScore(match.score);
-              if (analysis.isWin) { points += 2 * weight; wins++; }
-              else if (analysis.isCloseLoss) { points += 1 * weight; closeLosses++; }
-            });
-
-            return { player, points: parseFloat(points.toFixed(2)), matches: roundMatches.length, wins, closeLosses };
-          }).sort((a, b) => b.points - a.points);
-
-          return (
-            <div key={`${ageGroup}-${level}`} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <Trophy size={16} className="text-amber-500"/>
-                {displayAgeGroup(ageGroup)} - Klasse {level}
-                <span className="text-xs text-slate-500 font-normal ml-auto">
-                  {groupPlayers.length} Spieler | Gewichtung: {getGroupSizeWeight(groupPlayers.length)}
-                </span>
-              </h4>
-              <div className="space-y-2">
-                {standings.map((standing, idx) => {
-                  const playerResult = results.find(r => r.playerId === standing.player.id && r.tournamentId === selectedTournament.id);
-                  const roundMatches = playerResult?.matches.filter(m => m.roundId === selectedRound.id) || [];
-                  const isExpanded = expandedPlayerId === standing.player.id;
-
-                  return (
-                    <div key={standing.player.id}>
-                      <div className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:shadow-md transition ${
-                          idx === 0 ? 'bg-amber-100 border border-amber-300' :
-                          idx === 1 ? 'bg-slate-100 border border-slate-300' :
-                          idx === 2 ? 'bg-orange-100 border border-orange-300' : 'bg-white border border-slate-200'
-                        }`} onClick={() => setExpandedPlayerId(isExpanded ? null : standing.player.id)}>
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                          idx === 0 ? 'bg-amber-500 text-white' :
-                          idx === 1 ? 'bg-slate-400 text-white' :
-                          idx === 2 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'
-                        }`}>
-                          {idx + 1}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-bold text-slate-800">{standing.player.name}</div>
-                          <div className="text-xs text-slate-500">
-                            {standing.matches} Spiele | {standing.wins} Siege | {standing.closeLosses} Knappe Niederlagen
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-emerald-600">{standing.points}</div>
-                          <div className="text-[10px] text-slate-500 uppercase">Punkte</div>
-                        </div>
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}/>
-                      </div>
-
-                      {isExpanded && roundMatches.length > 0 && (
-                        <div className="ml-12 mt-2 space-y-2 bg-white p-3 rounded-lg border border-slate-200">
-                          <div className="text-xs font-bold text-slate-600 uppercase mb-2">Spiele dieses Spieltags</div>
-                          {roundMatches.map(match => {
-                            const isEditing = editingMatchId === match.id;
-                            const opponent = players.find(p => p.id === match.opponentId);
-
-                            return (
-                              <div key={match.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
-                                <div className="flex-1 text-sm">
-                                  <span className="font-medium">{standing.player.name}</span>
-                                  <span className="text-slate-400 mx-1">vs</span>
-                                  <span className="font-medium">{opponent?.name || 'Unbekannt'}</span>
-                                </div>
-                                {isEditing ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      value={editMatchScore}
-                                      onChange={e => setEditMatchScore(e.target.value)}
-                                      className="w-24 px-2 py-1 border rounded text-sm"
-                                      placeholder="6:4 6:2"
-                                    />
-                                    <button onClick={() => {
-                                      // Speichere geänderten Score
-                                      if (editMatchScore.trim() && playerResult) {
-                                        const updatedResults = results.map(r => {
-                                          if (r.playerId === standing.player.id && r.tournamentId === selectedTournament.id) {
-                                            return {
-                                              ...r,
-                                              matches: r.matches.map(m => {
-                                                if (m.id === match.id) {
-                                                  const analysis = analyzeSingleScore(editMatchScore.trim());
-                                                  return { ...m, score: editMatchScore.trim(), isWin: analysis.isWin, isCloseLoss: analysis.isCloseLoss };
-                                                }
-                                                return m;
-                                              })
-                                            };
-                                          }
-                                          // Update auch Gegner-Match
-                                          if (r.playerId === match.opponentId && r.tournamentId === selectedTournament.id) {
-                                            return {
-                                              ...r,
-                                              matches: r.matches.map(m => {
-                                                if (m.opponentId === standing.player.id && m.roundId === match.roundId) {
-                                                  const reversedScore = reverseScoreString(editMatchScore.trim());
-                                                  const analysis = analyzeSingleScore(reversedScore);
-                                                  return { ...m, score: reversedScore, isWin: analysis.isWin, isCloseLoss: analysis.isCloseLoss };
-                                                }
-                                                return m;
-                                              })
-                                            };
-                                          }
-                                          return r;
-                                        });
-                                        updateResults(updatedResults);
-                                        setEditingMatchId(null);
-                                        setEditMatchScore('');
-                                        addToast('Ergebnis aktualisiert', 'success');
-                                      }
-                                    }} className="p-1 text-green-600 hover:bg-green-100 rounded">
-                                      <Check size={14}/>
-                                    </button>
-                                    <button onClick={() => {
-                                      setEditingMatchId(null);
-                                      setEditMatchScore('');
-                                    }} className="p-1 text-slate-600 hover:bg-slate-100 rounded">
-                                      <X size={14}/>
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className={`text-sm font-mono font-bold ${match.isWin ? 'text-green-600' : match.isCloseLoss ? 'text-orange-600' : 'text-red-600'}`}>
-                                      {match.score}
-                                    </span>
-                                    {isAdmin && (
-                                      <button onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingMatchId(match.id);
-                                        setEditMatchScore(match.score);
-                                      }} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
-                                        <Edit2 size={12}/>
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        }).filter(Boolean);
-      })}
-    </div>
-  );
-})()}
+{/* TABELLEN-ANSICHT ENTFERNT - Informationen sind im Rangliste-Tab verfügbar */}
 
 </div>
 )}
@@ -6019,9 +5876,43 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 </div>
 
+{/* THEME-AUSWAHL */}
+<div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
+    <Sun size={20} className="text-purple-600"/> Darstellung
+  </h3>
+  <div className="flex items-center gap-4">
+    <span className="text-sm text-slate-600 dark:text-slate-300 font-medium">Theme:</span>
+    <div className="flex gap-2">
+      <button
+        onClick={() => setTheme('light')}
+        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
+          theme === 'light'
+            ? 'bg-emerald-100 text-emerald-800 shadow-sm font-medium'
+            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+        }`}
+      >
+        <Sun size={18} className={theme === 'light' ? 'text-yellow-500' : ''} />
+        Light Mode
+      </button>
+      <button
+        onClick={() => setTheme('dark')}
+        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
+          theme === 'dark'
+            ? 'bg-slate-700 text-slate-100 shadow-sm font-medium'
+            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
+        }`}
+      >
+        <Moon size={18} className={theme === 'dark' ? 'text-blue-400' : ''} />
+        Dark Mode
+      </button>
+    </div>
+  </div>
+</div>
+
 {/* EINSTELLUNGEN */}
 
-<div className="bg-white p-6 rounded-xl border border-slate-200">
+<div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
 
 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Settings className="text-blue-500"/> Einstellungen</h3>
 
