@@ -538,8 +538,8 @@ const [plannerAgeGroup, setPlannerAgeGroup] = useState<AgeGroup>('Red');
 const [plannerMatchMode, setPlannerMatchMode] = useState<'auto' | 'single' | 'double'>('auto');
 const [plannerScoreInput, setPlannerScoreInput] = useState<Record<string, string>>({});
 const [plannerScoringMode, setPlannerScoringMode] = useState<ScoringMode>('race10');
-const [plannerNewName, setPlannerNewName] = useState('');
-const [plannerNewBirth, setPlannerNewBirth] = useState('');
+const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
+const [plannerPlayerSearch, setPlannerPlayerSearch] = useState('');
 const [plannerNewLevel, setPlannerNewLevel] = useState<Level>('C');
 const [plannerNewClub, setPlannerNewClub] = useState('');
 
@@ -966,23 +966,34 @@ const savePlannerResult = (fixture: PlannedMatch) => {
 };
 
 const quickAddPlannerPlayer = () => {
-  if (!plannerNewName || !plannerNewBirth) {
-    addToast('Name und Geburtsdatum angeben', 'error');
+  if (!plannerSelectedPlayerId) {
+    addToast('Bitte wählen Sie einen Spieler aus', 'error');
     return;
   }
-  const newPlayer: Player = {
+  const selectedPlayer = players.find(p => p.id === plannerSelectedPlayerId);
+  if (!selectedPlayer) {
+    addToast('Spieler nicht gefunden', 'error');
+    return;
+  }
+  // Spieler wird zur Planung hinzugefügt (in der Altersgruppe/Level)
+  const key = getPlannerKey(plannerAgeGroup, plannerNewLevel);
+  const newMatch: Match = {
     id: generateId(),
-    name: plannerNewName,
-    birthDate: plannerNewBirth,
-    level: plannerNewLevel,
-    club: plannerNewClub || undefined
+    round: 1,
+    type: 'group',
+    home: selectedPlayer.id,
+    away: '',
+    homeScore: [],
+    awayScore: [],
+    archived: false
   };
-  updatePlayers([...players, newPlayer]);
-  setPlannerNewName('');
-  setPlannerNewBirth('');
-  setPlannerNewClub('');
+  setPlannerFixtures({
+    ...plannerFixtures,
+    [key]: [...(plannerFixtures[key] || []), newMatch]
+  });
+  setPlannerSelectedPlayerId('');
   setPlannerNewLevel('C');
-  addToast('Spieler hinzugefügt', 'success');
+  addToast(`${selectedPlayer.name} hinzugefügt`, 'success');
 };
 
 
@@ -993,7 +1004,7 @@ const handleCreateTeam = () => {
 
 if (!teamMember1 || !teamMember2 || teamMember1 === teamMember2) {
 
-addToast("Bitte zwei unterschiedliche Spieler wÃ¤hlen", "error");
+addToast("Bitte zwei unterschiedliche Spieler wählen", "error");
 
 return;
 
@@ -2778,6 +2789,8 @@ let totalCL = 0;
 
 let totalMatches = 0;
 
+let participationCount = 0;
+
 
 
 tourn.rounds.forEach(round => {
@@ -2791,22 +2804,8 @@ const roundLevel = getMatchLevel(matchesInRound[0], player.level || null);
 
 // Teilnahme bestÃ¤tigt (hat Matches in einer Runde dieses Turniers)
 
-hasPlayedInScope = true;
-participationCount++;
-
-
-
-const roundParticipants = players.filter(p => {
-
-if (calculateAgeGroup(p) !== ageGroup) return false;
-
-const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
-
-return r?.matches.some(m => m.roundId === round.id);
-
-}).length;
-
-
+       hasPlayedInScope = true;
+       participationCount++;
 
 matchesInRound.forEach(m => {
 
@@ -3490,7 +3489,7 @@ onChange={(e) => setH2hSearch(e.target.value)}
 
 <select className="w-full p-2 border rounded text-sm mb-4" value={h2hOpponentId} onChange={(e) => setH2hOpponentId(e.target.value)}>
 
-<option value="">-- Gegner wÃ¤hlen --</option>
+<option value="">-- Gegner wählen --</option>
 
 {h2hPlayers.map(p => (
 
@@ -3728,7 +3727,7 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' : 'border-transparent text-slate-500 hover:bg-slate-50'}`}>
 
-<ClipboardList size={18} /> {isAdmin ? 'Spieler HinzufÃ¼gen' : 'Anmeldung'}
+<ClipboardList size={18} /> {isAdmin ? 'Spieler Hinzufügen' : 'Anmeldung'}
 
 </button>
 
@@ -4497,53 +4496,98 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 <div className="animate-in fade-in space-y-6">
 
 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col gap-4">
-<div className="flex flex-col md:flex-row gap-3 md:items-center justify-between">
+<div className="flex flex-col gap-4">
 <div>
 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Calendar className="text-emerald-600" size={18}/> Spielplan nach Alters- & Leistungsklasse</h2>
 <p className="text-sm text-slate-600">Eine Tabelle pro Level. Matches werden erst erzeugt, wenn du auf „Auslosen“ klickst.</p>
 </div>
-<div className="flex gap-3 items-center">
-<select value={plannerAgeGroup} onChange={e => setPlannerAgeGroup(e.target.value as AgeGroup)} className="p-2 border rounded-lg bg-white text-sm">
+<div className="flex flex-col gap-3 w-full">
+<div className="flex flex-col gap-2">
+<label className="text-xs font-bold text-slate-600 uppercase">Altersklasse</label>
+<select value={plannerAgeGroup} onChange={e => setPlannerAgeGroup(e.target.value as AgeGroup)} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
 {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
   <option key={g} value={g}>{displayAgeGroup(g)}</option>
 ))}
 </select>
-<select value={plannerMatchMode} onChange={e => setPlannerMatchMode(e.target.value as 'auto' | 'single' | 'double')} className="p-2 border rounded-lg bg-white text-sm">
+</div>
+<div className="flex flex-col gap-2">
+<label className="text-xs font-bold text-slate-600 uppercase">Spielmodus</label>
+<select value={plannerMatchMode} onChange={e => setPlannerMatchMode(e.target.value as 'auto' | 'single' | 'double')} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
   <option value="auto">Automatisch</option>
   <option value="single">1x jeder gegen jeden</option>
   <option value="double">2x jeder gegen jeden</option>
 </select>
+</div>
 {isAdmin && (
-  <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded flex items-center gap-2">
-    <Shuffle size={16}/> Auslosen
+  <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
+    <Shuffle size={18}/> Auslosen
   </button>
 )}
 </div>
 
 {isAdmin && (
-  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 grid md:grid-cols-4 gap-3 items-end">
-    <div>
-      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name</label>
-      <input value={plannerNewName} onChange={e => setPlannerNewName(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Spielername"/>
+  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-5">
+    <div className="flex items-center gap-2 mb-4">
+      <UserPlus size={20} className="text-blue-600"/>
+      <h3 className="text-base font-bold text-slate-800">Spieler hinzufügen</h3>
     </div>
-    <div>
-      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geburtsdatum</label>
-      <input type="date" value={plannerNewBirth} onChange={e => setPlannerNewBirth(e.target.value)} className="w-full p-2 border rounded text-sm"/>
-    </div>
-    <div>
-      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Level</label>
-      <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className="w-full p-2 border rounded text-sm bg-white">
-        <option value="A">{LEVEL_LABELS.A}</option>
-        <option value="B">{LEVEL_LABELS.B}</option>
-        <option value="C">{LEVEL_LABELS.C}</option>
-      </select>
-    </div>
-    <div>
-      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Verein (optional)</label>
-      <input value={plannerNewClub} onChange={e => setPlannerNewClub(e.target.value)} className="w-full p-2 border rounded text-sm" placeholder="Verein"/>
-    </div>
-    <div className="md:col-span-4 flex justify-end">
-      <button onClick={quickAddPlannerPlayer} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded flex items-center gap-2"><UserPlus size={16}/> Spieler hinzufügen</button>
+    <div className="grid md:grid-cols-5 gap-4 items-end">
+      <div className="md:col-span-2">
+        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Spieler (Suche)</label>
+        <input 
+          type="text" 
+          value={plannerPlayerSearch} 
+          onChange={e => setPlannerPlayerSearch(e.target.value)} 
+          placeholder="Name oder Geburtsjahr eingeben..."
+          className="w-full p-3.5 border border-blue-300 rounded-lg text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+        />
+        {plannerPlayerSearch && (
+          <div className="absolute z-10 w-full mt-1 border border-blue-300 rounded-lg bg-white shadow-lg max-h-56 overflow-y-auto">
+            {players
+              .filter(p => 
+                p.name.toLowerCase().includes(plannerPlayerSearch.toLowerCase()) || 
+                p.birthDate.includes(plannerPlayerSearch)
+              )
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .slice(0, 10)
+              .map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setPlannerSelectedPlayerId(p.id);
+                    setPlannerPlayerSearch('');
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-blue-100 text-sm border-b border-slate-100 last:border-b-0"
+                >
+                  <div className="font-medium text-slate-800">{p.name}</div>
+                  <div className="text-xs text-slate-500">{new Date(p.birthDate).toLocaleDateString('de-DE')}</div>
+                </button>
+              ))}
+            {players.filter(p => 
+              p.name.toLowerCase().includes(plannerPlayerSearch.toLowerCase()) || 
+              p.birthDate.includes(plannerPlayerSearch)
+            ).length === 0 && (
+              <div className="px-4 py-2 text-sm text-slate-500">Keine Spieler gefunden</div>
+            )}
+          </div>
+        )}
+        {plannerSelectedPlayerId && (
+          <div className="text-xs text-slate-600 bg-blue-100 px-3 py-2 rounded-lg">
+            ✓ {players.find(p => p.id === plannerSelectedPlayerId)?.name}
+          </div>
+        )}
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-slate-600 uppercase mb-2">Wählen</label>
+        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className="w-full p-3.5 border border-blue-300 rounded-lg text-sm bg-white hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="A">{LEVEL_LABELS.A}</option>
+          <option value="B">{LEVEL_LABELS.B}</option>
+          <option value="C">{LEVEL_LABELS.C}</option>
+        </select>
+      </div>
+      <div>
+        <button onClick={quickAddPlannerPlayer} className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"><UserPlus size={16}/> Hinzufügen</button>
+      </div>
     </div>
   </div>
 )}
@@ -4551,7 +4595,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
   <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><CalendarDays size={16}/> Turniertage</h4>
   {tournaments.length === 0 ? (
-    <p className="text-sm text-slate-500">Keine Turniere angelegt.</p>
+    <p className="text-slate-500 text-center py-6">Keine Turniere angelegt.</p>
   ) : (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
       {tournaments.map(t => (
@@ -4738,7 +4782,7 @@ onChange={e => setTeamSearch1(e.target.value)}
 
 <select className="w-full p-2 border rounded" value={teamMember1} onChange={e => setTeamMember1(e.target.value)}>
 
-<option value="">Spieler 1 wÃ¤hlen</option>
+<option value="">Spieler 1 wählen</option>
 
 {players.filter(p => !p.isTeam).filter(p => !teamSearch1 || p.name.toLowerCase().includes(teamSearch1.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
 
@@ -4766,7 +4810,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <select className="w-full p-2 border rounded" value={teamMember2} onChange={e => setTeamMember2(e.target.value)}>
 
-<option value="">Spieler 2 wÃ¤hlen</option>
+<option value="">Spieler 2 wählen</option>
 
 {players.filter(p => !p.isTeam && p.id !== teamMember1).filter(p => !teamSearch2 || p.name.toLowerCase().includes(teamSearch2.toLowerCase())).sort((a,b) => a.name.localeCompare(b.name)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
 
@@ -4999,7 +5043,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <button onClick={handleRegistration} disabled={!regName || !regBirthDate} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-4 rounded-xl mt-4 transition shadow-xl shadow-emerald-100">
 
-{isAdmin ? 'HinzufÃ¼gen' : 'Anmelden'}
+{isAdmin ? 'Hinzufügen' : 'Anmelden'}
 
 </button>
 
@@ -5058,7 +5102,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className="flex-1 p-2.5 border rounded-lg bg-slate-50">
 
-<option value="">-- Turnierserie wÃ¤hlen --</option>
+<option value="">-- Turnierserie wählen --</option>
 
 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
 
@@ -5076,7 +5120,7 @@ disabled={!selectedTournamentId}
 
 >
 
-<option value="">-- Spieltag / Runde wÃ¤hlen --</option>
+<option value="">-- Spieltag / Runde wählen --</option>
 
 {tournaments.find(t => t.id === selectedTournamentId)?.rounds.map(r => (
 
@@ -5088,7 +5132,7 @@ disabled={!selectedTournamentId}
 
 </div>
 
-{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswÃ¤hlen!</p>}
+{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswählen!</p>}
 
 </div>
 
@@ -5175,7 +5219,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase">Gegner wÃ¤hlen</label>
+<label className="text-xs font-bold text-slate-500 uppercase">Gegner wählen</label>
 
 <input
 
@@ -5193,7 +5237,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className="w-full mt-1 p-2.5 border rounded-lg bg-slate-50 focus:bg-white transition">
 
-<option value="">-- Gegner wÃ¤hlen --</option>
+<option value="">-- Gegner wählen --</option>
 
 {players
 
@@ -5299,7 +5343,7 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 <input type="text" placeholder="Passwort" className="bg-slate-700 border-none rounded p-2 text-sm text-white" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}/>
 
-<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">HinzufÃ¼gen</button>
+<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">Hinzufügen</button>
 
 </div>
 
@@ -5500,7 +5544,7 @@ min={2}
 
 max={10000}
 
-className="w-full p-2 border rounded text-sm"
+className="w-full p-3 border border-blue-300 rounded-lg text-sm bg-white"
 
 value={testPlayerCount}
 
@@ -5524,7 +5568,7 @@ type="number"
 
 min={1}
 
-className="w-full p-2 border rounded text-sm"
+className="w-full p-3 border border-blue-300 rounded-lg text-sm bg-white"
 
 value={testMatchesPerPlayer}
 
