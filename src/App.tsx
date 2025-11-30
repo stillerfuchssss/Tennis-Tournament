@@ -4746,7 +4746,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 <div className="flex flex-col gap-3 w-full">
 <div className="grid md:grid-cols-2 gap-3">
   <div className="flex flex-col gap-2">
-    <label className="text-xs font-bold text-slate-600 uppercase">Turnier</label>
+    <label className={`text-xs font-bold uppercase ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Turnier</label>
     <select value={plannerSelectedTournamentId} onChange={e => {
       setPlannerSelectedTournamentId(e.target.value);
       const t = tournaments.find(t => t.id === e.target.value);
@@ -4949,7 +4949,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             <select
               value={currentMode}
               onChange={e => setGroupMatchModes(prev => ({ ...prev, [groupKey]: e.target.value as 'auto' | 'single' | 'double' }))}
-              className="p-2 border border-slate-300 dark:border-slate-600 rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100' : 'bg-white text-slate-900'}"
+              className={`p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}
             >
               <option value="auto">Automatisch</option>
               <option value="single">1x gegen jeden</option>
