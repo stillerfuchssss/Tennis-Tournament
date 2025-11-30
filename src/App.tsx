@@ -104,9 +104,9 @@ const LEVEL_COLORS: Record<Level, string> = {
 
 const AGE_GROUP_ORDER: AgeGroup[] = ['Red', 'Orange', 'Green', 'Yellow'];
 const AGE_GROUP_RULES: { id: AgeGroup; fromYear: number; toYear?: number; description: string }[] = [
-  { id: 'Red', fromYear: 2017, description: '2017 und juenger' },
-  { id: 'Orange', fromYear: 2016, toYear: 2016, description: '2016 und juenger' },
-  { id: 'Green', fromYear: 2014, toYear: 2015, description: '2014 und juenger' },
+  { id: 'Red', fromYear: 2017, description: '2017 und jünger' },
+  { id: 'Orange', fromYear: 2016, toYear: 2016, description: '2016 und jünger' },
+  { id: 'Green', fromYear: 2014, toYear: 2015, description: '2014 und jünger' },
   { id: 'Yellow', fromYear: 2011, toYear: 2013, description: '2013 bis 2011' },
 ];
 const AGE_STAGE_LABELS: Record<AgeGroup, string> = {
@@ -207,6 +207,8 @@ date: string;
 isActive: boolean;
 
 isTestData?: boolean;
+
+archived?: boolean;
 
 rounds: TournamentRound[];
 
@@ -447,6 +449,7 @@ const [rankingLevelFilter, setRankingLevelFilter] = useState<Level | 'All'>('All
 const [rankingSearchQuery, setRankingSearchQuery] = useState('');
 const [rankingViewMode, setRankingViewMode] = useState<'overall' | 'tournament'>('overall');
 const [rankingTournamentSelection, setRankingTournamentSelection] = useState('');
+const [includeArchivedInRanking, setIncludeArchivedInRanking] = useState(false);
 
 const [currentPage, setCurrentPage] = useState(1);
 
@@ -565,6 +568,8 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   const [plannerFilterLevel, setPlannerFilterLevel] = useState<Level | 'All'>('All');
   const [plannerNewLevel, setPlannerNewLevel] = useState<Level>('C');
   const [plannerTargetAgeGroup, setPlannerTargetAgeGroup] = useState<AgeGroup>('Red');
+  const [editingWeightGroup, setEditingWeightGroup] = useState<string | null>(null);
+  const [editingWeightValue, setEditingWeightValue] = useState('');
   const [plannerCurrentPage, setPlannerCurrentPage] = useState(1);
   const [showTournamentField, setShowTournamentField] = useState(true);
   const [enableTournamentMenu, setEnableTournamentMenu] = useState(true);
@@ -879,7 +884,7 @@ return "Yellow";
 
 const canPlayInAgeGroup = (player: Player, targetAge: AgeGroup) => {
   const playerAge = calculateAgeGroup(player);
-  return AGE_RANK[playerAge] <= AGE_RANK[targetAge]; // juengere d�rfen nach oben, nicht umgekehrt
+  return AGE_RANK[playerAge] <= AGE_RANK[targetAge]; // jüngere dürfen nach oben, nicht umgekehrt
 };
 
 
@@ -918,7 +923,7 @@ const renderLevelBadge = (level?: Level | null, size: 'sm' | 'md' = 'md') => {
   const levelColor = level === 'C' && darkMode ? 'bg-emerald-900 text-emerald-300 border border-emerald-700' : LEVEL_COLORS[level];
   return (
     <span className={`inline-flex items-center font-semibold rounded-full ${levelColor} ${sizeClasses}`}>
-      Level {level}
+      Leistungsklasse {level}
     </span>
   );
 };
@@ -937,23 +942,35 @@ if (ageGroup && level) {
   }
 }
 
-// Finde die größte Gruppe über ALLE Levels und Altersgruppen
-let maxGroupSize = 1;
-(['A', 'B', 'C'] as Level[]).forEach(lvl => {
-  getSortedAgeGroups().filter(ag => ag !== 'All').forEach(ag => {
-    const count = players.filter(p => calculateAgeGroup(p) === ag && p.level === lvl).length;
-    if (count > maxGroupSize) maxGroupSize = count;
-  });
-});
+// Finde die größte Gruppe in der gleichen Altersklasse UND Leistungsklasse
+// = Anzahl ALLER Spieler mit dieser Kombination (unabhängig von Turnier/Spieltag)
+let maxGroupSize = participantCount; // Mindestens die aktuelle Gruppe
 
-// Neue faire Gewichtungsberechnung:
-// Basis: größte Gruppe = 1.0
-// Kleinere Gruppen erhalten moderate Gewichtung basierend auf Wurzel-Verhältnis
-// Formel: sqrt(maxGroupSize) / sqrt(participantCount)
-// Dies gibt eine sanftere Gewichtung als direkte Division
-const weight = Math.sqrt(maxGroupSize) / Math.sqrt(participantCount);
+if (ageGroup && level) {
+  // Zähle alle Spieler mit dieser Altersklasse UND Leistungsklasse
+  maxGroupSize = players.filter(p => calculateAgeGroup(p) === ageGroup && p.level === level).length;
 
-return parseFloat(weight.toFixed(2));
+  // Falls die aktuelle Gruppe größer ist (sollte nicht vorkommen), verwende sie
+  if (participantCount > maxGroupSize) maxGroupSize = participantCount;
+}
+
+// Faire Gewichtungsberechnung mit Dämpfungsfaktor:
+// Kleinere Gruppen erhalten leicht HÖHERE Gewichtung (weniger Spiele = etwas mehr Punkte pro Spiel)
+// Größte Gruppe erhält Gewichtung 1.0 (Minimum)
+// Dämpfungsfaktor 0.2 (20%) macht die Unterschiede sehr klein und fair
+//
+// Formel: 1.0 + (sqrt(maxGroupSize) / sqrt(participantCount) - 1.0) * 0.2
+//
+// Beispiel bei maxGroupSize = 10:
+// - Gruppe mit 10 Spielern: 1.00 (Basisgewichtung)
+// - Gruppe mit 5 Spielern:  1.00 + (1.41 - 1.00) * 0.2 = 1.08 (nur 8% höher)
+// - Gruppe mit 3 Spielern:  1.00 + (1.83 - 1.00) * 0.2 = 1.17 (nur 17% höher)
+const baseWeight = Math.sqrt(maxGroupSize) / Math.sqrt(participantCount);
+const dampingFactor = 0.2; // Nur 20% des Unterschieds wird berücksichtigt
+const weight = 1.0 + (baseWeight - 1.0) * dampingFactor;
+
+// Stelle sicher, dass die Gewichtung mindestens 1.0 ist
+return parseFloat(Math.max(1.0, weight).toFixed(2));
 
 };
 
@@ -985,13 +1002,49 @@ const generateRoundRobin = (ids: string[], mode: 'single' | 'double') => {
   return fixtures;
 };
 
-const collectPlannerStats = (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string) => {
-  const eligible = players.filter(p => calculateAgeGroup(p) === age && p.level === level);
+const collectPlannerStats = (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string, groupFixtures?: PlannedMatch[]) => {
+  // Sammle Spieler-IDs, die in den Fixtures dieser Gruppe vorkommen
+  const fixturePlayerIds = new Set<string>();
+  if (groupFixtures) {
+    groupFixtures.forEach(f => {
+      fixturePlayerIds.add(f.p1Id);
+      fixturePlayerIds.add(f.p2Id);
+    });
+  }
+
+  // Filtere Spieler: Nur die, die entweder in Fixtures vorkommen oder gespeicherte planner-Ergebnisse haben
+  const eligible = players.filter(p => {
+    if (calculateAgeGroup(p) !== age || p.level !== level) return false;
+
+    // Spieler ist in Fixtures enthalten
+    if (fixturePlayerIds.has(p.id)) return true;
+
+    // ODER Spieler hat gespeicherte planner-Ergebnisse in dieser Gruppe
+    const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
+    if (res) {
+      // Nur planner-Matches berücksichtigen (roundId beginnt mit "planner-")
+      const hasPlannerMatches = res.matches.some(m =>
+        m.roundId && m.roundId.startsWith('planner-') && getMatchLevel(m, p.level || null) === level
+      );
+      if (hasPlannerMatches) return true;
+    }
+
+    return false;
+  });
+
+  // Für die Anzeige verwenden wir alle eligible Spieler
   const participantCount = eligible.length;
-  const weight = getGroupSizeWeight(participantCount, age, level);
+
+  // Für die Gewichtungsberechnung verwenden wir nur die Spieler, die aktuell in Fixtures sind
+  // (nicht die mit alten Matches, die keine Fixtures mehr haben)
+  const fixtureParticipantCount = fixturePlayerIds.size > 0 ? fixturePlayerIds.size : participantCount;
+  const weight = getGroupSizeWeight(fixtureParticipantCount, age, level);
   const stats = eligible.map(p => {
     const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
-    let matches = res ? res.matches.filter(m => getMatchLevel(m, p.level || null) === level) : [];
+    // Nur planner-Matches für dieses Level berücksichtigen
+    let matches = res ? res.matches.filter(m =>
+      m.roundId && m.roundId.startsWith('planner-') && getMatchLevel(m, p.level || null) === level
+    ) : [];
 
     // Filtere nach roundId wenn angegeben
     if (roundId) {
@@ -2933,11 +2986,12 @@ const ageGroup = calculateAgeGroup(player);
 
 
 
-const relevantTournaments = rankingScope === 'overall'
+const relevantTournaments = (rankingScope === 'overall'
 
 ? tournaments
 
-: tournaments.filter(t => t.id === rankingScope);
+: tournaments.filter(t => t.id === rankingScope))
+.filter(t => includeArchivedInRanking || !t.archived);
 
 
 
@@ -3234,7 +3288,7 @@ data = data.filter(p => p.name.toLowerCase().includes(rankingSearchQuery.toLower
 
 return data.sort((a, b) => b.totalPoints - a.totalPoints);
 
-}, [players, results, tournaments, rankingScope, rankingAgeGroup, rankingLevelFilter, rankingRoundScope, rankingSearchQuery]);
+}, [players, results, tournaments, rankingScope, rankingAgeGroup, rankingLevelFilter, rankingRoundScope, rankingSearchQuery, includeArchivedInRanking]);
 
 
 
@@ -3513,7 +3567,7 @@ return (
 
 playerResults.length === 0 ? (
 
-<p className="text-slate-400 italic">Noch keine Spiele eingetragen.</p>
+<p className={`italic ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>Noch keine Spiele eingetragen.</p>
 
 ) : (
 
@@ -3527,17 +3581,17 @@ if (!r) return null;
 
 return (
 
-<div key={t.id} className="border border-slate-200 rounded-xl overflow-hidden">
+<div key={t.id} className={`border rounded-xl overflow-hidden shadow-md ${darkMode ? 'border-slate-700 bg-slate-800' : 'border-slate-200 bg-white'}`}>
 
-<div className={`p-3 border-b font-bold flex justify-between transition-colors ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+<div className={`p-4 border-b font-bold flex justify-between transition-colors ${darkMode ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-emerald-50 border-emerald-200 text-slate-800'}`}>
 
-<span>{t.name}</span>
+<span className="text-base">{t.name}</span>
 
-<span className={`text-xs font-normal ${darkMode ? 'text-slate-400' : 'text-slate-400'}`}>{new Date(t.date).toLocaleDateString('de-DE')}</span>
+<span className={`text-xs font-normal ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{new Date(t.date).toLocaleDateString('de-DE')}</span>
 
 </div>
 
-<div className="divide-y divide-slate-100">
+<div className={`divide-y ${darkMode ? 'divide-slate-700' : 'divide-slate-200'}`}>
 
 {r.matches.map(m => {
 
@@ -3554,19 +3608,19 @@ const isEditing = editingMatchId === m.id;
 
 return (
 
-<div key={m.id} className={`p-3 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
+<div key={m.id} className={`p-4 flex justify-between items-center transition-colors ${darkMode ? 'hover:bg-slate-700/50' : 'hover:bg-emerald-50'}`}>
 
 <div className="flex-1">
 
-<div className="flex items-center gap-2">
+<div className="flex items-center gap-2 flex-wrap">
 
-<span className="text-sm font-bold text-slate-800">vs. {m.opponentName}</span>
+<span className={`text-base font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>vs. {m.opponentName}</span>
 
-{roundName && <span className="text-[10px] bg-slate-100 px-1.5 rounded text-slate-500">{roundName}</span>}
+{roundName && <span className={`text-xs px-2 py-1 rounded font-medium ${darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>{roundName}</span>}
 
 {!isEditing && (
 
-<span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${m.isWin ? 'bg-green-100 text-green-700' : m.isCloseLoss ? 'bg-orange-100 text-orange-700' : 'bg-red-50 text-red-400'}`}>
+<span className={`text-xs px-2 py-1 rounded font-bold uppercase shadow-sm ${m.isWin ? 'bg-green-500 dark:bg-green-600 text-white' : m.isCloseLoss ? 'bg-orange-500 dark:bg-orange-600 text-white' : 'bg-red-500 dark:bg-red-600 text-white'}`}>
 
 {m.isWin ? 'Sieg' : m.isCloseLoss ? 'Knapp' : 'Ndlg'}
 
@@ -3600,7 +3654,7 @@ className={`border rounded p-1 text-xs w-32 font-mono transition-colors ${darkMo
 
 ) : (
 
-<div className="text-xs text-slate-500 font-mono mt-1">{m.score}</div>
+<div className={`text-sm font-mono font-bold mt-1 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{m.score}</div>
 
 )}
 
@@ -3718,7 +3772,7 @@ onChange={(e) => setH2hSearch(e.target.value)}
 
 />
 
-<select className="w-full p-2 border rounded text-sm mb-4" value={h2hOpponentId} onChange={(e) => setH2hOpponentId(e.target.value)}>
+<select className={`w-full p-2 border rounded text-sm mb-4 transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`} value={h2hOpponentId} onChange={(e) => setH2hOpponentId(e.target.value)}>
 
 <option value="">-- Gegner wählen --</option>
 
@@ -3735,21 +3789,21 @@ onChange={(e) => setH2hSearch(e.target.value)}
 
 <div className="text-center animate-in fade-in">
 
-<div className="text-3xl font-bold text-slate-800 mb-1">{h2hWins} : {h2hMatches.length - h2hWins}</div>
+<div className={`text-4xl font-black mb-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{h2hWins} : {h2hMatches.length - h2hWins}</div>
 
-<div className="text-xs text-slate-500">{h2hMatches.length} Spiele gesamt</div>
+<div className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>{h2hMatches.length} Spiele gesamt</div>
 
 <div className="mt-4 space-y-2 text-left">
 
 {h2hMatches.map(m => (
 
-<div key={m.id} className="text-xs flex justify-between border-b pb-1 border-slate-200">
+<div key={m.id} className={`text-sm flex justify-between items-center p-2 rounded-lg transition-colors ${darkMode ? 'bg-slate-700 border border-slate-600' : 'bg-white border border-slate-200'}`}>
 
-<span>{new Date(m.timestamp).toLocaleDateString()}</span>
+<span className={`font-medium ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>{new Date(m.timestamp).toLocaleDateString()}</span>
 
-<span className="font-mono">{m.score}</span>
+<span className={`font-mono font-bold ${darkMode ? 'text-slate-100' : 'text-slate-900'}`}>{m.score}</span>
 
-<span className={m.isWin ? 'text-green-600 font-bold' : 'text-red-500'}>{m.isWin ? 'Sieg' : 'Ndlg'}</span>
+<span className={m.isWin ? 'text-green-500 dark:text-green-400 font-bold px-2 py-1 rounded bg-green-100 dark:bg-green-900/30' : 'text-red-500 dark:text-red-400 font-bold px-2 py-1 rounded bg-red-100 dark:bg-red-900/30'}>{m.isWin ? 'Sieg' : 'Ndlg'}</span>
 
 </div>
 
@@ -4077,7 +4131,7 @@ className={`px-4 py-1.5 text-xs transition-colors ${darkMode ? 'text-slate-100 b
 ))}
 </select>
 <select value={rankingLevelFilter} onChange={e => setRankingLevelFilter(e.target.value as Level | 'All')} className={`w-32 min-w-[8rem] p-2 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
-<option value="All">Alle Level</option>
+<option value="All">Alle Leistungsklassen</option>
 <option value="A">{LEVEL_LABELS.A}</option>
 <option value="B">{LEVEL_LABELS.B}</option>
 <option value="C">{LEVEL_LABELS.C}</option>
@@ -4090,7 +4144,7 @@ className={`px-4 py-1.5 text-xs transition-colors ${darkMode ? 'text-slate-100 b
 
 <div className="flex justify-end">
 
-<button onClick={() => setShowPointsInfo(!showPointsInfo)} className="text-xs text-slate-500 flex items-center gap-1 hover:text-emerald-600">
+<button onClick={() => setShowPointsInfo(!showPointsInfo)} className={`text-xs flex items-center gap-1 transition-colors ${darkMode ? 'text-slate-400 hover:text-emerald-400' : 'text-slate-500 hover:text-emerald-600'}`}>
 
 <Info size={14}/> Wie werden Punkte berechnet?
 
@@ -4144,15 +4198,17 @@ className={`px-4 py-1.5 text-xs transition-colors ${darkMode ? 'text-slate-100 b
 
 <th className="p-4 w-10"></th>
 
+{isAdmin && <th className="p-4 w-16">Aktion</th>}
+
 </tr>
 
 </thead>
 
-<tbody className="divide-y divide-slate-100">
+<tbody className="divide-y divide-slate-100 dark:divide-slate-700">
 
 {paginatedData.length === 0 ? (
 
-<tr><td colSpan={5} className="p-8 text-center text-slate-400">Keine Spieler gefunden {rankingScope !== 'overall' ? 'für diesen Zeitraum' : ''}.</td></tr>
+<tr><td colSpan={5} className="p-8 text-center text-slate-400 dark:text-slate-500">Keine Spieler gefunden {rankingScope !== 'overall' ? 'für diesen Zeitraum' : ''}.</td></tr>
 
 ) : (
 
@@ -4162,49 +4218,58 @@ const realRank = (currentPage - 1) * ITEMS_PER_PAGE + idx + 1;
 
 return (
 
-<tr key={player.id} onClick={() => setViewingPlayer(player)} className={`cursor-pointer transition group ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
+<tr key={player.id} onClick={() => setViewingPlayer(player)} className={`cursor-pointer transition group ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-emerald-50/50'}`}>
 
 <td className="p-4 text-center">
 
-<span className={`inline-block w-8 h-8 leading-8 rounded-full font-bold text-sm ${realRank <= 3 ? 'bg-yellow-100 text-yellow-700' : 'text-slate-400'}`}>{realRank}</span>
+<span className={`inline-block w-10 h-10 leading-10 rounded-full font-bold text-sm shadow-md ${
+  realRank === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900' :
+  realRank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900' :
+  realRank === 3 ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-900' :
+  darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+}`}>{realRank}</span>
 
 </td>
 
 <td className="p-4">
 
-<div className="font-bold text-slate-800 text-lg flex items-center gap-2">
+<div className={`font-bold text-lg flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
 
-{player.isTeam && <Users2 size={16} className="text-blue-500"/>}
+{player.isTeam && <Users2 size={16} className="text-blue-500 dark:text-blue-400"/>}
 
 {player.name}
 
 </div>
 
+<div className="mt-1">
 {renderLevelBadge(player.level, 'sm')}
+</div>
 
 </td>
 
-<td className="p-4 text-sm text-slate-500">
+<td className="p-4 text-sm">
 
-<span className="bg-slate-100 px-2 py-1 rounded font-medium">{player.ageGroup}</span>
+<span className={`px-3 py-1.5 rounded-lg font-semibold shadow-sm ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-emerald-100 text-emerald-800'}`}>{player.ageGroup}</span>
 
 </td>
 
 <td className="p-4 text-right">
 
-<span className="text-2xl font-bold text-slate-800">{player.totalPoints}</span>
+<div className="flex flex-col items-end gap-1">
+<span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{player.totalPoints}</span>
 
-<div className="text-[10px] text-slate-400 mt-1">
+<div className={`text-[10px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
 
 {player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teilnahme • ` : ''}
 
 {player.details[0]?.stats}
 
 </div>
+</div>
 
 </td>
 
-<td className="p-4 text-slate-300 group-hover:text-emerald-500"><ChevronRight size={20}/></td>
+<td className={`p-4 transition-colors ${darkMode ? 'text-slate-600 group-hover:text-emerald-400' : 'text-slate-300 group-hover:text-emerald-500'}`}><ChevronRight size={20}/></td>
 
 </tr>
 
@@ -4225,7 +4290,7 @@ return (
 
 <div className={`border-t p-4 flex justify-between items-center transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
-<div className="text-xs text-slate-500">
+<div className={`text-xs font-medium ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
 
 Seite {currentPage} von {Math.max(1, totalPages)} • {rankingData.length} Spieler
 
@@ -4803,9 +4868,69 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 </select>
 </div>
 {isAdmin && (
-  <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
-    <Shuffle size={18}/> Alle Levels auslosen
-  </button>
+  <>
+    <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
+      <Shuffle size={18}/> Alle Leistungsklassen auslosen
+    </button>
+    <button
+      onClick={() => {
+        setConfirmDialog({
+          isOpen: true,
+          message: `Alle Gruppen für ${displayAgeGroup(plannerAgeGroup)} löschen? Alle Fixtures und Punkte werden gelöscht.`,
+          onConfirm: () => {
+            // Lösche alle drei Leistungsklassen (A, B, C) für die aktuelle Altersgruppe
+            const levels: Level[] = ['A', 'B', 'C'];
+
+            // Sammle ALLE Fixtures, die gelöscht werden sollen (BEVOR wir sie löschen)
+            const allFixturesToDelete: PlannedMatch[] = [];
+            levels.forEach(level => {
+              const key = getPlannerKey(plannerAgeGroup, level);
+              const groupFixtures = plannerFixtures[key] || [];
+              allFixturesToDelete.push(...groupFixtures);
+            });
+
+            // Sammle alle betroffenen Spieler-IDs
+            const playerIds = new Set<string>();
+            allFixturesToDelete.forEach(f => {
+              playerIds.add(f.p1Id);
+              playerIds.add(f.p2Id);
+            });
+
+            // Entferne ALLE gespeicherten Ergebnisse, die zu diesen Fixtures gehören
+            const updatedResults = results.map(playerResult => {
+              return {
+                ...playerResult,
+                matches: playerResult.matches.filter(m => {
+                  // Prüfe ob dieses Match zu einem der zu löschenden Fixtures gehört
+                  const belongsToDeletedFixture = allFixturesToDelete.some(f =>
+                    m.roundId === `planner-${f.round}` &&
+                    ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
+                     (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
+                  );
+                  return !belongsToDeletedFixture;
+                })
+              };
+            });
+
+            // Lösche alle Fixtures
+            const updatedFixtures = { ...plannerFixtures };
+            levels.forEach(level => {
+              const key = getPlannerKey(plannerAgeGroup, level);
+              updatedFixtures[key] = [];
+            });
+
+            setResults(updatedResults);
+            setPlannerFixtures(updatedFixtures);
+            addToast(`Alle Gruppen für ${displayAgeGroup(plannerAgeGroup)} gelöscht`, 'success');
+            closeConfirm();
+          }
+        });
+      }}
+      className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+    >
+      <Trash2 size={16}/> Alle Gruppen löschen
+    </button>
+  </>
 )}
 </>
   );
@@ -4837,7 +4962,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             onChange={e => setPlannerFilterLevel(e.target.value as Level | 'All')}
             className={`p-2 border rounded-lg text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
           >
-            <option value="All">Alle Level</option>
+            <option value="All">Alle Leistungsklassen</option>
             <option value="A">{LEVEL_LABELS.A}</option>
             <option value="B">{LEVEL_LABELS.B}</option>
             <option value="C">{LEVEL_LABELS.C}</option>
@@ -4880,7 +5005,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Level</label>
+        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Leistungsklasse</label>
         <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
           <option value="A">{LEVEL_LABELS.A}</option>
           <option value="B">{LEVEL_LABELS.B}</option>
@@ -4888,7 +5013,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         </select>
       </div>
       <div>
-        <button onClick={quickAddPlannerPlayer} className="w-full px-4 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"><UserPlus size={16}/> Hinzufügen</button>
+        <button onClick={quickAddPlannerPlayer} className="w-full px-4 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 dark:bg-blue-500 dark:hover:bg-blue-600 dark:active:bg-blue-700 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg dark:shadow-blue-900/30 transition-all"><UserPlus size={16}/> Hinzufügen</button>
       </div>
     </div>
   </div>
@@ -4922,7 +5047,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {(['A','B','C'] as Level[]).map(level => {
   const key = getPlannerKey(plannerAgeGroup, level);
   const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
-  const { stats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId);
+  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId, fixtures);
+  const stats = unsortedStats.slice().sort((a, b) => b.points - a.points);
   const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
 
   // Paginierung für Fixtures
@@ -4938,11 +5064,77 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
     <div key={level} className={`rounded-xl shadow-sm border p-6 space-y-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
       <div className="flex justify-between items-start gap-3">
         <div className="flex-1">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             {renderLevelBadge(level, 'md')}
-            <span className="text-slate-500 text-sm">Altersklasse: {displayAgeGroup(plannerAgeGroup)}</span>
+            <span className="text-slate-500 dark:text-slate-400 text-sm">Altersklasse: {displayAgeGroup(plannerAgeGroup)}</span>
           </h3>
-          <div className="text-xs text-slate-500 mt-1">Teilnehmer: {participantCount} • Gruppengewicht: x{weight.toFixed(2)}</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+            <span>Teilnehmer: {participantCount} • Gruppengewicht: x{weight.toFixed(2)}</span>
+            {isAdmin && editingWeightGroup !== groupKey && (
+              <button
+                onClick={() => {
+                  setEditingWeightGroup(groupKey);
+                  setEditingWeightValue(weight.toFixed(2));
+                }}
+                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
+                title="Gewichtung bearbeiten"
+              >
+                <Edit2 size={14} className="text-blue-600 dark:text-blue-400" />
+              </button>
+            )}
+            {isAdmin && editingWeightGroup === groupKey && (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max="10"
+                  value={editingWeightValue}
+                  onChange={e => setEditingWeightValue(e.target.value)}
+                  className="w-20 px-2 py-1 border border-blue-300 dark:border-blue-600 rounded text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                />
+                <button
+                  onClick={() => {
+                    const newWeight = parseFloat(editingWeightValue);
+                    if (isNaN(newWeight) || newWeight <= 0) {
+                      addToast('Ungültige Gewichtung', 'error');
+                      return;
+                    }
+                    setCustomGroupWeights(prev => ({ ...prev, [groupKey]: newWeight }));
+                    setEditingWeightGroup(null);
+                    addToast('Gewichtung gespeichert', 'success');
+                  }}
+                  className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                  title="Speichern"
+                >
+                  <Check size={14} />
+                </button>
+                <button
+                  onClick={() => setEditingWeightGroup(null)}
+                  className="p-1 bg-slate-400 hover:bg-slate-500 text-white rounded"
+                  title="Abbrechen"
+                >
+                  <X size={14} />
+                </button>
+                {customGroupWeights[groupKey] !== undefined && (
+                  <button
+                    onClick={() => {
+                      const newWeights = { ...customGroupWeights };
+                      delete newWeights[groupKey];
+                      setCustomGroupWeights(newWeights);
+                      setEditingWeightGroup(null);
+                      addToast('Auf automatische Gewichtung zurückgesetzt', 'success');
+                    }}
+                    className="p-1 bg-orange-500 hover:bg-orange-600 text-white rounded ml-1"
+                    title="Auf automatisch zurücksetzen"
+                  >
+                    <ArrowRightCircle size={14} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         {isAdmin && (
           <div className="flex flex-col gap-2 min-w-[200px]">
@@ -4976,35 +5168,61 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             >
               <Shuffle size={12} className="inline mr-1"/> Auslosen
             </button>
+            <button
+              onClick={() => {
+                setConfirmDialog({
+                  isOpen: true,
+                  message: `Gesamte Gruppe ${LEVEL_LABELS[level]} (${displayAgeGroup(plannerAgeGroup)}) löschen? Alle Fixtures und Punkte werden gelöscht.`,
+                  onConfirm: () => {
+                    // Sammle alle Fixtures dieser Gruppe
+                    const groupFixtures = fixtures;
+
+                    // Sammle alle Spieler-IDs
+                    const playerIds = new Set<string>();
+                    groupFixtures.forEach(f => {
+                      playerIds.add(f.p1Id);
+                      playerIds.add(f.p2Id);
+                    });
+
+                    // Entferne alle gespeicherten Ergebnisse für diese Gruppe
+                    const updatedResults = results.map(playerResult => {
+                      return {
+                        ...playerResult,
+                        matches: playerResult.matches.filter(m => {
+                          // Behalte nur matches, die nicht zu den gelöschten Fixtures gehören
+                          const belongsToDeletedFixture = groupFixtures.some(f =>
+                            m.roundId === `planner-${f.round}` &&
+                            ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
+                             (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
+                          );
+                          return !belongsToDeletedFixture;
+                        })
+                      };
+                    });
+                    setResults(updatedResults);
+
+                    // Entferne alle Fixtures
+                    setPlannerFixtures(prev => ({ ...prev, [key]: [] }));
+                    addToast(`Gruppe ${LEVEL_LABELS[level]} komplett gelöscht`, 'success');
+                    closeConfirm();
+                  }
+                });
+              }}
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded flex items-center justify-center gap-1"
+              title="Gesamte Gruppe löschen"
+            >
+              <Trash2 size={12}/> Gruppe löschen
+            </button>
           </div>
         )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 overflow-x-auto space-y-3">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input
-                type="text"
-                placeholder="Spieler suchen..."
-                className={`w-full pl-10 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors ${darkMode ? 'bg-slate-800 border-slate-600 text-slate-100 placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-600'}`}
-                value=""
-                onChange={() => {}}
-              />
-            </div>
-            <select
-              className={`px-4 py-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors min-w-[180px] ${darkMode ? 'bg-slate-800 border-slate-600 text-slate-100' : 'bg-white border-slate-300 text-slate-900'}`}
-            >
-              <option value="all">Alle Spieler</option>
-              {stats.map(s => (
-                <option key={s.player.id} value={s.player.id}>{s.player.name}</option>
-              ))}
-            </select>
-          </div>
           <table className="w-full text-left">
             <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-xs font-bold tracking-wide">
               <tr>
+                <th className="px-4 py-3 text-center w-16">Platz</th>
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Verein</th>
                 <th className="px-4 py-3 text-center">Teiln.</th>
@@ -5012,20 +5230,82 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 <th className="px-4 py-3 text-center">KN</th>
                 <th className="px-4 py-3 text-center">N</th>
                 <th className="px-4 py-3 text-right">Punkte</th>
+                {isAdmin && <th className="px-4 py-3 text-center w-16">Aktion</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
               {stats.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Noch keine Spieler in diesem Level.</td></tr>
-              ) : stats.map(s => (
+                <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Noch keine Spieler in dieser Leistungsklasse</td></tr>
+              ) : stats.map((s, idx) => (
                 <tr key={s.player.id} className={`cursor-pointer transition ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`} onClick={() => setViewingPlayer(s.player)}>
+                  <td className="px-4 py-3.5 text-center">
+                    <span className={`inline-block w-8 h-8 leading-8 rounded-full font-bold text-sm shadow-sm ${
+                      idx === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900' :
+                      idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900' :
+                      idx === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-900' :
+                      darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
+                    }`}>{idx + 1}</span>
+                  </td>
                   <td className="px-4 py-3.5 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">{s.player.name}</td>
                   <td className="px-4 py-3.5 text-slate-500 dark:text-slate-400 text-sm">{s.player.club || '-'}</td>
                   <td className="px-4 py-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">{s.participationPoints}</td>
                   <td className="px-4 py-3.5 text-center font-semibold text-green-600 dark:text-green-400">{s.wins}</td>
                   <td className="px-4 py-3.5 text-center font-semibold text-orange-600 dark:text-orange-400">{s.close}</td>
                   <td className="px-4 py-3.5 text-center font-semibold text-red-600 dark:text-red-400">{s.losses}</td>
-                  <td className="px-4 py-3.5 text-right text-base font-bold text-slate-800 dark:text-slate-100">{s.points.toFixed(1)}</td>
+                  <td className="px-4 py-3.5 text-right">
+                    <span className="text-xl font-black bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 bg-clip-text text-transparent">
+                      {s.points.toFixed(1)}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">Pkt</span>
+                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => {
+                          setConfirmDialog({
+                            isOpen: true,
+                            message: `${s.player.name} komplett aus ${LEVEL_LABELS[level]} entfernen? Alle Fixtures und Punkte werden gelöscht.`,
+                            onConfirm: () => {
+                              // Sammle alle Fixtures dieses Spielers in dieser Gruppe
+                              const playerFixtures = (plannerFixtures[key] || []).filter(
+                                f => f.p1Id === s.player.id || f.p2Id === s.player.id
+                              );
+
+                              // Entferne alle Fixtures, die diesen Spieler betreffen
+                              const updatedFixtures = (plannerFixtures[key] || []).filter(
+                                f => f.p1Id !== s.player.id && f.p2Id !== s.player.id
+                              );
+                              setPlannerFixtures(prev => ({ ...prev, [key]: updatedFixtures }));
+
+                              // Entferne alle gespeicherten Ergebnisse für diese Fixtures
+                              const updatedResults = results.map(playerResult => {
+                                return {
+                                  ...playerResult,
+                                  matches: playerResult.matches.filter(m => {
+                                    // Behalte nur matches, die nicht zu den gelöschten Fixtures gehören
+                                    const belongsToDeletedFixture = playerFixtures.some(f =>
+                                      m.roundId === `planner-${f.round}` &&
+                                      ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
+                                       (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
+                                    );
+                                    return !belongsToDeletedFixture;
+                                  })
+                                };
+                              });
+                              setResults(updatedResults);
+
+                              addToast(`${s.player.name} komplett aus Gruppe entfernt`, 'success');
+                              closeConfirm();
+                            }
+                          });
+                        }}
+                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                        title="Spieler und alle Punkte entfernen"
+                      >
+                        <Trash2 size={16} className="text-red-600 dark:text-red-400" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -5043,9 +5323,32 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             <div className="space-y-4 mb-4">
               {paginatedFixtures.map(f => (
             <div key={f.id} className={`rounded-lg border p-4 shadow-sm hover:shadow-md transition ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                  <div className={`flex justify-between text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <div className={`flex justify-between items-center text-xs mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     <span className="font-medium">Runde {f.round}</span>
-                    <span className={`px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>{LEVEL_LABELS[level]}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>{LEVEL_LABELS[level]}</span>
+                      {isAdmin && (
+                        <button
+                          onClick={() => {
+                            setConfirmDialog({
+                              isOpen: true,
+                              message: `Dieses Fixture (Runde ${f.round}) wirklich löschen?`,
+                              onConfirm: () => {
+                                // Entferne das Fixture
+                                const updatedFixtures = (plannerFixtures[key] || []).filter(fix => fix.id !== f.id);
+                                setPlannerFixtures(prev => ({ ...prev, [key]: updatedFixtures }));
+                                addToast('Fixture gelöscht', 'success');
+                                closeConfirm();
+                              }
+                            });
+                          }}
+                          className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
+                          title="Fixture löschen"
+                        >
+                          <Trash2 size={12} className="text-red-600 dark:text-red-400" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className={`font-bold mb-3 text-base ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
                     <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p1Id) || null)}>{resolveName(f.p1Id)}</span>
@@ -5077,10 +5380,15 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                               <Edit2 size={12}/>
                             </button>
                             <button onClick={() => {
-                              if (confirm('Dieses Spiel wirklich löschen?')) {
-                                deletePlannerResult(f);
-                              }
-                            }} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Löschen">
+                              setConfirmDialog({
+                                isOpen: true,
+                                message: 'Dieses Spiel wirklich löschen?',
+                                onConfirm: () => {
+                                  deletePlannerResult(f);
+                                  closeConfirm();
+                                }
+                              });
+                            }} className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors" title="Löschen">
                               <Trash2 size={12}/>
                             </button>
                           </div>
@@ -5103,7 +5411,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                         </div>
                       )}
                       <div className="flex gap-2 items-center justify-between">
-                        <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className="p-1.5 border rounded text-xs">
+                        <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className={`text-xs p-1.5 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
                           <option value="race4">Zählweise: bis 4</option>
                           <option value="race10">Zählweise: bis 10</option>
                           <option value="race15">Zählweise: bis 15</option>
@@ -5280,7 +5588,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <th className="p-4">Altersklasse</th>
 
-<th className="p-4">Level</th>
+<th className="p-4">Leistungsklasse</th>
 
 <th className="p-4">Status</th>
 
@@ -5532,7 +5840,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 {AGE_GROUP_ORDER.map(group => <option key={group} value={group}>{displayAgeGroup(group)}</option>)}
 </select>
 <select value={regPlayersLevelFilter} onChange={e => setRegPlayersLevelFilter(e.target.value as Level | 'All')} className={`flex-1 min-w-[120px] p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
-<option value="All">Alle Level</option>
+<option value="All">Alle Leistungsklassen</option>
 <option value="A">{LEVEL_LABELS.A}</option>
 <option value="B">{LEVEL_LABELS.B}</option>
 <option value="C">{LEVEL_LABELS.C}</option>
@@ -5602,7 +5910,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase">Turnier & Spieltag</label>
+<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Turnier & Spieltag</label>
 
 <div className="flex gap-2 mt-1">
 
@@ -5620,7 +5928,7 @@ value={selectedRoundId}
 
 onChange={(e) => setSelectedRoundId(e.target.value)}
 
-className={`flex-1 p-2.5 border rounded-lg bg-slate-50 disabled:bg-slate-100 ${roundError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+className={`flex-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 disabled:bg-slate-800 disabled:text-slate-500' : 'bg-slate-50 text-slate-900 border-slate-300 disabled:bg-slate-100 disabled:text-slate-400'} ${roundError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
 
 disabled={!selectedTournamentId}
 
@@ -5638,7 +5946,7 @@ disabled={!selectedTournamentId}
 
 </div>
 
-{roundError && <p className="text-red-500 text-xs mt-1">Bitte Spieltag auswählen!</p>}
+{roundError && <p className="text-red-500 dark:text-red-400 text-xs mt-1">Bitte Spieltag auswählen!</p>}
 
 </div>
 
@@ -5651,13 +5959,13 @@ disabled={!selectedTournamentId}
 
 <div className="flex justify-between items-center mb-2">
 
-<span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Filter size={12}/> Filter für Auswahl</span>
+<span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase flex items-center gap-1"><Filter size={12}/> Filter für Auswahl</span>
 
 </div>
 
 <div className="flex gap-2 flex-wrap items-center">
 
-<select value={inputAgeGroupFilter} onChange={e => setInputAgeGroupFilter(e.target.value)} className="text-xs p-1 border rounded">
+<select value={inputAgeGroupFilter} onChange={e => setInputAgeGroupFilter(e.target.value)} className="text-xs p-1.5 border rounded transition-colors bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600">
 
 <option value="All">Alle Altersklassen</option>
 
@@ -5684,7 +5992,7 @@ disabled={!selectedTournamentId}
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase">Unser Spieler</label>
+<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Unser Spieler</label>
 
 <input
 
@@ -5725,7 +6033,7 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 <div>
 
-<label className="text-xs font-bold text-slate-500 uppercase">Gegner wählen</label>
+<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Gegner wählen</label>
 
 <input
 
@@ -5772,7 +6080,7 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 <div className={`p-4 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
 
-<label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Spielstand</label>
+<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-2 block">Spielstand</label>
 
 <div className="space-y-2">
 
@@ -5780,7 +6088,7 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 <div key={idx} className="flex items-center gap-2">
 
-<span className="text-xs font-bold text-slate-400 w-12">Satz {idx+1}</span>
+<span className="text-xs font-bold text-slate-500 dark:text-slate-400 w-12">Satz {idx+1}</span>
 
 <input type="number" min="0" placeholder="6" className={`w-16 p-2 text-center border rounded font-bold transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`} value={set.p1} onChange={(e) => updateSet(idx, 'p1', e.target.value)} />
 
@@ -5796,7 +6104,7 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 </div>
 
-<button onClick={addSet} className="mt-3 text-xs flex items-center gap-1 text-emerald-600 font-bold hover:underline"><Plus size={14}/> Weiteren Satz hinzufügen</button>
+<button onClick={addSet} className="mt-3 text-xs flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold hover:underline"><Plus size={14}/> Weiteren Satz hinzufügen</button>
 
 </div>
 
@@ -5820,7 +6128,7 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 
 
-<button onClick={handleAddResult} disabled={!selectedPlayerId || !selectedTournamentId || !matchAnalysis || !selectedOpponentId} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-200">Match Speichern</button>
+<button onClick={handleAddResult} disabled={!selectedPlayerId || !selectedTournamentId || !matchAnalysis || !selectedOpponentId} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 dark:disabled:text-slate-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30">Match Speichern</button>
 
 </div>
 
@@ -5871,40 +6179,6 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 </div>
 
-</div>
-
-{/* THEME-AUSWAHL */}
-<div className={`rounded-xl shadow-sm border p-6 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-  <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-    <Sun size={20} className="text-purple-600"/> Darstellung
-  </h3>
-  <div className="flex items-center gap-4">
-    <span className={`text-sm font-medium ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>Theme:</span>
-    <div className="flex gap-2">
-      <button
-        onClick={() => setTheme('light')}
-        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
-          theme === 'light'
-            ? `${darkMode ? 'bg-emerald-900 text-emerald-300 shadow-sm font-medium' : 'bg-emerald-100 text-emerald-800 shadow-sm font-medium'}`
-            : `${darkMode ? 'bg-slate-700 text-slate-400 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
-        }`}
-      >
-        <Sun size={18} className={theme === 'light' ? 'text-yellow-500' : ''} />
-        Light Mode
-      </button>
-      <button
-        onClick={() => setTheme('dark')}
-        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${
-          theme === 'dark'
-            ? 'bg-slate-700 text-slate-100 shadow-sm font-medium'
-            : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'
-        }`}
-      >
-        <Moon size={18} className={theme === 'dark' ? 'text-blue-400' : ''} />
-        Dark Mode
-      </button>
-    </div>
-  </div>
 </div>
 
 {/* EINSTELLUNGEN */}
@@ -6008,7 +6282,20 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 <div className={`p-6 rounded-xl border transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 
-<h3 className={`font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-purple-500"/> Turnierserien</h3>
+<div className="flex justify-between items-center mb-4">
+  <h3 className={`font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-purple-500"/> Turnierserien</h3>
+
+  <button
+    onClick={() => setIncludeArchivedInRanking(!includeArchivedInRanking)}
+    className={`text-xs px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all ${
+      includeArchivedInRanking
+        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700'
+        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'
+    }`}
+  >
+    <Database size={14}/> {includeArchivedInRanking ? 'Archivierte in Rangliste' : 'Archivierte ausgeblendet'}
+  </button>
+</div>
 
 <div className="flex gap-2 mb-6">
 
@@ -6032,10 +6319,33 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 <div className="flex items-center gap-2">
 
+{t.archived && (
+  <span className="text-xs px-2 py-1 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-medium border border-orange-200 dark:border-orange-800">
+    Archiviert
+  </span>
+)}
+
 {isGenerating ? <Loader2 className="animate-spin text-slate-400" size={16}/> : (
+  <>
+    <button
+      onClick={() => {
+        setTournaments(tournaments.map(tour =>
+          tour.id === t.id ? { ...tour, archived: !tour.archived } : tour
+        ));
+        addToast(t.archived ? 'Turnier reaktiviert' : 'Turnier archiviert', 'success');
+      }}
+      className={`px-2.5 py-1.5 rounded text-xs font-medium transition-all ${
+        t.archived
+          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-900/50 border border-emerald-300 dark:border-emerald-700'
+          : 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 border border-orange-200 dark:border-orange-800'
+      }`}
+      title={t.archived ? "Turnier reaktivieren" : "Turnier archivieren"}
+    >
+      <Database size={14} className="inline"/> {t.archived ? 'Reaktivieren' : 'Archivieren'}
+    </button>
 
-<button onClick={() => deleteTournament(t.id)} className={`p-1.5 rounded transition-colors ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`} title="Turnier & Ergebnisse löschen"><Trash2 size={16}/></button>
-
+    <button onClick={() => deleteTournament(t.id)} className={`p-1.5 rounded transition-colors ${darkMode ? 'text-slate-400 hover:text-red-400 hover:bg-slate-800' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`} title="Turnier & Ergebnisse löschen"><Trash2 size={16}/></button>
+  </>
 )}
 
 </div>
