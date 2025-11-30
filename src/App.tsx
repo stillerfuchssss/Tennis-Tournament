@@ -382,12 +382,6 @@ const [adminUsernameInput, setAdminUsernameInput] = useState('');
 const [adminPasswordInput, setAdminPasswordInput] = useState('');
 
 // Theme
-type Theme = 'light' | 'dark';
-const [theme, setTheme] = useState<Theme>(() => {
-  const saved = localStorage.getItem('theme');
-  return (saved as Theme) || 'light';
-});
-
 // Custom Group Weights
 const [customGroupWeights, setCustomGroupWeights] = useState<Record<string, number>>(() => {
   const saved = localStorage.getItem('customGroupWeights');
@@ -584,12 +578,6 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   useEffect(() => {
     setPlannerTargetAgeGroup(plannerAgeGroup);
   }, [plannerAgeGroup]);
-
-  // Theme persistence
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
 
   // Custom group weights persistence
   useEffect(() => {
