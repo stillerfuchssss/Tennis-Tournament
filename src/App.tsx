@@ -6,7 +6,7 @@ Trophy, Users, Plus, Trash2, Activity,
 
 Medal, UserPlus,
 
-CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, PlayCircle,
+CheckCircle2, AlertCircle, X, ChevronRight, ChevronLeft, ChevronDown, PlayCircle,
 
 Search, Calendar, Settings, Unlock, ShieldCheck,
 
@@ -424,13 +424,12 @@ const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, message: st
 // Ranking Filters
 
 const [rankingScope, setRankingScope] = useState<string>('overall');
-
 const [rankingRoundScope, setRankingRoundScope] = useState<string>('all');
-
 const [rankingAgeGroup, setRankingAgeGroup] = useState<string>('All');
 const [rankingLevelFilter, setRankingLevelFilter] = useState<Level | 'All'>('All');
-
 const [rankingSearchQuery, setRankingSearchQuery] = useState('');
+const [rankingViewMode, setRankingViewMode] = useState<'overall' | 'tournament'>('overall');
+const [rankingTournamentSelection, setRankingTournamentSelection] = useState('');
 
 const [currentPage, setCurrentPage] = useState(1);
 
@@ -480,6 +479,11 @@ const [regTournamentId, setRegTournamentId] = useState('');
 const [regSelectedRounds, setRegSelectedRounds] = useState<string[]>([]);
 
 const [showRegSuccess, setShowRegSuccess] = useState(false);
+const [regAllowAgeOverride, setRegAllowAgeOverride] = useState(false);
+const [regManualAgeGroup, setRegManualAgeGroup] = useState<AgeGroup | ''>('');
+const [regPlayersAgeFilter, setRegPlayersAgeFilter] = useState<AgeGroup | 'All'>('All');
+const [regPlayersLevelFilter, setRegPlayersLevelFilter] = useState<Level | 'All'>('All');
+const [regPlayersSearch, setRegPlayersSearch] = useState('');
 
 
 
@@ -554,6 +558,9 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
 
   // Spielplan-Ansicht: Auslosung oder Tabellen
   const [plannerView, setPlannerView] = useState<'fixtures' | 'standings'>('fixtures');
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
+  const [editMatchScore, setEditMatchScore] = useState<string>('');
 
   // Synchronisiere Target-Altersgruppe mit plannerAgeGroup
   useEffect(() => {
@@ -786,7 +793,35 @@ setEditPlayerClub(viewingPlayer.club || '');
 setEditPlayerEmail(viewingPlayer.email || '');
 }, [viewingPlayer]);
 
+useEffect(() => {
+  if (rankingViewMode !== 'tournament') {
+    if (rankingScope !== 'overall') setRankingScope('overall');
+    if (rankingRoundScope !== 'all') setRankingRoundScope('all');
+    return;
+  }
 
+  if (!rankingTournamentSelection) {
+    if (tournaments.length > 0) {
+      setRankingTournamentSelection(tournaments[0].id);
+    } else if (rankingScope !== 'overall') {
+      setRankingScope('overall');
+    }
+    return;
+  }
+
+  if (rankingScope !== rankingTournamentSelection) {
+    setRankingScope(rankingTournamentSelection);
+    setRankingRoundScope('all');
+  }
+}, [rankingViewMode, rankingTournamentSelection, rankingScope, rankingRoundScope, tournaments]);
+
+useEffect(() => {
+  if (rankingViewMode !== 'tournament') return;
+  if (!rankingTournamentSelection) return;
+  if (!tournaments.some(t => t.id === rankingTournamentSelection)) {
+    setRankingTournamentSelection(tournaments[0]?.id || '');
+  }
+}, [rankingTournamentSelection, rankingViewMode, tournaments]);
 
 const calculateAgeGroup = (input: string | Player): AgeGroup => {
 
@@ -827,7 +862,21 @@ return present;
 
 };
 
-const regPreviewAge = regBirthDate ? formatAgeGroupLabel(calculateAgeGroup(regBirthDate)) : 'wird automatisch zugewiesen';
+const regAutoAgeGroup = regBirthDate ? calculateAgeGroup(regBirthDate) : null;
+const regPreviewAge = regAutoAgeGroup ? formatAgeGroupLabel(regAutoAgeGroup) : 'wird automatisch zugewiesen';
+
+useEffect(() => {
+  if (!regAllowAgeOverride) return;
+  if (!regBirthDate) {
+    setRegAllowAgeOverride(false);
+    setRegManualAgeGroup('');
+    return;
+  }
+  if (!regManualAgeGroup) {
+    setRegManualAgeGroup(regAutoAgeGroup || 'Yellow');
+  }
+}, [regAllowAgeOverride, regBirthDate, regAutoAgeGroup, regManualAgeGroup]);
+
 const displayAgeGroup = (g: AgeGroup | 'All') => g === 'All' ? 'Alle Altersklassen' : formatAgeGroupLabel(g);
 const renderLevelBadge = (level?: Level | null, size: 'sm' | 'md' = 'md') => {
   if (!level) return null;
@@ -893,28 +942,19 @@ const generateRoundRobin = (ids: string[], mode: 'single' | 'double') => {
   return fixtures;
 };
 
-const ensurePlannerTournament = (age: AgeGroup, level: Level) => {
-  const id = `planner-${age}-${level}`;
-  const exists = tournaments.find(t => t.id === id);
-  if (exists) return id;
-  const newT = {
-    id,
-    name: `Spielplan ${age}/${level}`,
-    date: new Date().toISOString().split('T')[0],
-    isActive: false,
-    rounds: []
-  } as Tournament;
-  updateTournaments([...tournaments, newT]);
-  return id;
-};
-
-const collectPlannerStats = (age: AgeGroup, level: Level) => {
+const collectPlannerStats = (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string) => {
   const eligible = players.filter(p => calculateAgeGroup(p) === age && p.level === level);
   const participantCount = eligible.length;
   const weight = getGroupSizeWeight(participantCount);
   const stats = eligible.map(p => {
-    const res = results.find(r => r.playerId === p.id);
-    const matches = res ? res.matches.filter(m => getMatchLevel(m, p.level || null) === level) : [];
+    const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
+    let matches = res ? res.matches.filter(m => getMatchLevel(m, p.level || null) === level) : [];
+
+    // Filtere nach roundId wenn angegeben
+    if (roundId) {
+      matches = matches.filter(m => m.roundId === roundId);
+    }
+
     let wins = 0, close = 0, losses = 0;
     // Teilnahme pro Turniertag: wir zählen jedes RoundId einmal, wenn ein Match dort vorliegt
     const roundIds = new Set<string>();
@@ -925,7 +965,7 @@ const collectPlannerStats = (age: AgeGroup, level: Level) => {
       if (m.roundId) roundIds.add(m.roundId);
     });
     const basePoints = wins * 2 + close * 1;
-    const participationPoints = roundIds.size > 0 ? roundIds.size : (matches.length > 0 ? 1 : 0);
+    const participationPoints = roundIds.size; // 1 Punkt pro Spieltag
     const points = parseFloat((basePoints * weight + participationPoints).toFixed(1));
     return { player: p, wins, losses, close, points, weight, participationPoints };
   });
@@ -955,8 +995,51 @@ const generatePlannerForAgeGroup = (age: AgeGroup) => {
   addToast(`Auslosung für ${displayAgeGroup(age)} aktualisiert`, 'success');
 };
 
+const deletePlannerResult = (fixture: PlannedMatch) => {
+  if (!isAdmin) return;
+  if (!plannerSelectedTournamentId || !plannerSelectedRoundId) return;
+
+  const p1 = players.find(p => p.id === fixture.p1Id);
+  const p2 = players.find(p => p.id === fixture.p2Id);
+  if (!p1 || !p2) return;
+
+  let updatedResults = [...results];
+
+  // Entferne Matches für beide Spieler
+  [p1.id, p2.id].forEach(playerId => {
+    const playerResultIdx = updatedResults.findIndex(
+      r => r.playerId === playerId && r.tournamentId === plannerSelectedTournamentId
+    );
+    if (playerResultIdx >= 0) {
+      updatedResults[playerResultIdx].matches = updatedResults[playerResultIdx].matches.filter(
+        m => !(m.roundId === plannerSelectedRoundId &&
+               (m.opponentId === p1.id || m.opponentId === p2.id))
+      );
+      // Entferne leere Result-Einträge
+      if (updatedResults[playerResultIdx].matches.length === 0) {
+        updatedResults.splice(playerResultIdx, 1);
+      }
+    }
+  });
+
+  updateResults(updatedResults);
+
+  // Füge das Fixture wieder zur Auslosung hinzu
+  const newMap = { ...plannerFixtures };
+  const key = getPlannerKey(fixture.ageGroup, fixture.level);
+  if (!newMap[key]) newMap[key] = [];
+  newMap[key].push(fixture);
+  updatePlannerFixtures(newMap);
+
+  addToast('Spiel gelöscht', 'info');
+};
+
 const savePlannerResult = (fixture: PlannedMatch) => {
   if (!isAdmin) return;
+  if (!plannerSelectedTournamentId || !plannerSelectedRoundId) {
+    addToast('Bitte wähle zuerst ein Turnier und einen Spieltag aus', 'error');
+    return;
+  }
   const scoreStr = (plannerScoreInput[fixture.id] || '').trim();
   if (!scoreStr) { addToast('Bitte Spielstand eintragen', 'error'); return; }
   const p1 = players.find(p => p.id === fixture.p1Id);
@@ -965,13 +1048,13 @@ const savePlannerResult = (fixture: PlannedMatch) => {
   const mode = plannerScoringMode;
   const res1 = analyzeSingleScore(scoreStr, mode);
   const res2 = analyzeSingleScore(reverseScoreString(scoreStr), mode);
-  const tournamentId = ensurePlannerTournament(fixture.ageGroup, fixture.level);
+  const tournamentId = plannerSelectedTournamentId;
   let updatedResults = [...results];
   const addMatch = (playerId: string, opponentId: string, opponentName: string, res: {isWin:boolean; isCloseLoss:boolean}) => {
     const matchId = generateId();
     const entry: MatchRecord = {
       id: matchId,
-      roundId: `planner-${fixture.round}`,
+      roundId: plannerSelectedRoundId,
       opponentId,
       opponentName,
       score: playerId === p1.id ? scoreStr : reverseScoreString(scoreStr),
@@ -2037,6 +2120,18 @@ return;
 
 const trimmedClub = regClub.trim();
 const trimmedEmail = regEmail.trim();
+const autoAgeGroup = calculateAgeGroup(regBirthDate);
+const overrideAgeGroup = regAllowAgeOverride && regManualAgeGroup ? regManualAgeGroup : null;
+const manualAgeGroup = overrideAgeGroup && overrideAgeGroup !== autoAgeGroup ? overrideAgeGroup : undefined;
+const playerPayload: Player = {
+id: generateId(),
+name: regName,
+birthDate: regBirthDate,
+level: regLevel,
+club: trimmedClub || undefined,
+email: trimmedEmail || undefined,
+...(manualAgeGroup ? { manualAgeGroup } : {})
+};
 
 const data: RegistrationRequest = {
 
@@ -2060,7 +2155,7 @@ timestamp: Date.now()
 
 if (isAdmin) {
 
-updatePlayers([...players, { id: generateId(), name: regName, birthDate: regBirthDate, level: regLevel, club: trimmedClub || undefined, email: trimmedEmail || undefined }]);
+updatePlayers([...players, playerPayload]);
 
 addToast('Spieler hinzugefuegt');
 
@@ -2077,6 +2172,7 @@ addToast('Anmeldung gesendet');
 }
 
 setRegName(''); setRegBirthDate(''); setRegTournamentId(''); setRegSelectedRounds([]); setRegLevel('C'); setRegClub(''); setRegEmail('');
+setRegAllowAgeOverride(false); setRegManualAgeGroup('');
 
 };
 
@@ -2925,8 +3021,10 @@ const summaryLevel = getMatchLevel(res.matches[0], player.level || null);
 const uniqueTournParticipants = countParticipants('all', summaryLevel);
 
 const tournWeight = getGroupSizeWeight(uniqueTournParticipants);
+// Teilnahmepunkte: 1 Punkt pro Spieltag (Round) + 1 für Matches ohne Round
+const participationBonus = participationCount + (matchesNoRound.length > 0 ? 1 : 0);
 
-aggregatedPoints += Math.max(1, participationCount); // Teilnahme: mind. 1, sonst pro Spieltag
+aggregatedPoints += participationBonus;
 
 totalPoints += aggregatedPoints;
 
@@ -2940,9 +3038,9 @@ raw: aggregatedPoints.toFixed(1),
 
 weighted: aggregatedPoints.toFixed(1),
 
-stats: `Teilnahme: ${Math.max(1, participationCount)} ? ${totalWins} S (x${tournWeight.toFixed(2)}) / ${totalCL} KN (x${tournWeight.toFixed(2)})`,
+stats: `Teilnahme: ${participationBonus} ? ${totalWins} S (x${tournWeight.toFixed(2)}) / ${totalCL} KN (x${tournWeight.toFixed(2)})`,
 
-participationPoints: 1, // Ungewichtet
+participationPoints: participationBonus, // Ungewichtet, pro Spieltag
 
 participants: uniqueTournParticipants,
 
@@ -2959,21 +3057,23 @@ weight: tournWeight.toFixed(2)
 // Scope: Einzelner Spieltag oder Turnier ohne Runden
 
 const matchesInScope = res.matches.filter(m =>
-
 rankingRoundScope === 'all' || m.roundId === rankingRoundScope
-
 );
 
-
-if (matchesInScope.length > 0) {
-
-hasPlayedInScope = true; // Hat Matches im gewählten Filter
-
-} else {
-
+if (matchesInScope.length === 0) {
 return; // Keine Matches im Scope -> weiter zum nächsten Turnier
-
 }
+
+const requiresWinForScope = rankingScope !== 'overall';
+const hasRelevantWin = rankingRoundScope === 'all'
+  ? matchesInScope.some(m => m.isWin)
+  : matchesInScope.some(m => m.isWin && m.roundId === rankingRoundScope);
+
+if (requiresWinForScope && !hasRelevantWin) {
+  return; // Nur Spieler mit Siegen für diese Auswahl anzeigen
+}
+
+hasPlayedInScope = true;
 
 
 
@@ -3009,7 +3109,9 @@ if (m.isWin) wins++; else if (m.isCloseLoss) closeLosses++;
 
 
 
-const participationPoints = 1; // Teilnahme ungewichtet (dieser Spieltag)
+// Zähle eindeutige Spieltage (RoundIds) für Teilnahmepunkte
+const uniqueRoundIds = new Set(matchesInScope.map(m => m.roundId).filter(rid => rid !== undefined));
+const participationPoints = rankingRoundScope === 'all' ? uniqueRoundIds.size : 1;
 
 const turnierScore = participationPoints + matchPoints;
 
@@ -3026,7 +3128,7 @@ weighted: turnierScore.toFixed(1),
 
 stats: `Teilnahme: ${participationPoints} ? ${wins} S (x${groupWeight.toFixed(2)}) / ${closeLosses} KN (x${groupWeight.toFixed(2)})`,
 
-participationPoints: 1, // Ungewichtet
+participationPoints: participationPoints, // Ungewichtet, pro Spieltag
 
 participants: participantCount,
 
@@ -3102,6 +3204,17 @@ const totalPages = Math.ceil(rankingData.length / ITEMS_PER_PAGE);
 const paginatedData = rankingData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
 
+
+// --- REGISTER TAB PLAYER PREVIEW ---
+
+const registrationPlayersPreview = useMemo(() => {
+  if (!players) return [];
+  return players
+    .filter(p => regPlayersAgeFilter === 'All' || calculateAgeGroup(p) === regPlayersAgeFilter)
+    .filter(p => regPlayersLevelFilter === 'All' || p.level === regPlayersLevelFilter)
+    .filter(p => !regPlayersSearch || p.name.toLowerCase().includes(regPlayersSearch.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}, [players, regPlayersAgeFilter, regPlayersLevelFilter, regPlayersSearch]);
 
 // --- FILTERED PLAYERS LIST FOR PLAYERS TAB ---
 
@@ -3846,45 +3959,52 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 <div className="flex flex-col xl:flex-row xl:flex-wrap gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 items-stretch xl:items-center">
 
 
-<div className="flex flex-col gap-2 w-full md:w-auto">
+<div className="flex flex-col gap-3 w-full md:w-auto">
 
-<div className="flex items-center gap-2">
+<div className="flex items-center gap-3 flex-wrap">
 
 <LayoutList className="text-slate-400" size={20}/>
 
-<select value={rankingScope} onChange={(e) => setRankingScope(e.target.value)} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none w-full md:w-auto">
+<div className="bg-white border border-slate-200 rounded-lg flex overflow-hidden">
+<button
+onClick={() => setRankingViewMode('overall')}
+className={`px-4 py-2 text-sm font-bold transition ${rankingViewMode === 'overall' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+>
+Gesamt
+</button>
+<button
+onClick={() => setRankingViewMode('tournament')}
+className={`px-4 py-2 text-sm font-bold transition border-l border-slate-200 ${rankingViewMode === 'tournament' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
+>
+Turnier
+</button>
+</div>
 
-<option value="overall">ðŸ† Gesamtwertung</option>
+</div>
 
-<optgroup label="Einzelne Turniere">
-
+{rankingViewMode === 'tournament' && (
+<div className="ml-7 flex flex-col gap-2">
+<select
+value={rankingTournamentSelection}
+onChange={(e) => { setRankingTournamentSelection(e.target.value); setRankingRoundScope('all'); }}
+className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none w-full md:w-auto"
+>
+<option value="">-- Turnier wählen --</option>
 {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-
-</optgroup>
-
 </select>
 
-</div>
-
-
-{rankingScope !== 'overall' && (
-
-<div className="ml-7">
-
-<select value={rankingRoundScope} onChange={(e) => setRankingRoundScope(e.target.value)} className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none w-full">
-
+<select
+value={rankingRoundScope}
+onChange={(e) => setRankingRoundScope(e.target.value)}
+disabled={!rankingTournamentSelection}
+className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-emerald-500 outline-none w-full disabled:bg-slate-100 disabled:text-slate-400"
+>
 <option value="all">Alle Spieltage</option>
-
 {tournaments.find(t => t.id === rankingScope)?.rounds.map(r => (
-
 <option key={r.id} value={r.id}>{r.name} ({r.date})</option>
-
 ))}
-
 </select>
-
 </div>
-
 )}
 
 </div>
@@ -4595,9 +4715,15 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   <div className="flex flex-col gap-2">
     <label className="text-xs font-bold text-slate-600 uppercase">Spieltag</label>
     <select value={plannerSelectedRoundId} onChange={e => setPlannerSelectedRoundId(e.target.value)} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
-      {tournaments.find(t => t.id === plannerSelectedTournamentId)?.rounds.map(r => (
-        <option key={r.id} value={r.id}>{r.name} ({r.date})</option>
-      )) || <option value="">Keine Spieltage</option>}
+      {(() => {
+        const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
+        if (!selectedTournament || selectedTournament.rounds.length === 0) {
+          return <option value="">Keine Spieltage vorhanden</option>;
+        }
+        return selectedTournament.rounds.map(r => (
+          <option key={r.id} value={r.id}>{r.name} ({r.date})</option>
+        ));
+      })()}
     </select>
   </div>
 </div>
@@ -4628,8 +4754,27 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   </button>
 </div>
 
-{plannerView === 'fixtures' && (
+{plannerView === 'fixtures' && (() => {
+  const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
+  const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
+
+  return (
 <>
+{selectedTournament && selectedRound && (
+  <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-5 rounded-xl border border-emerald-800 shadow-lg">
+    <div className="flex items-center gap-3 text-white">
+      <CalendarDays size={24} className="text-emerald-100"/>
+      <div>
+        <div className="text-xs font-semibold text-emerald-200 uppercase tracking-wide">Aktuelle Auswahl</div>
+        <div className="text-xl font-bold">{selectedTournament.name}</div>
+        <div className="text-sm text-emerald-100 flex items-center gap-2 mt-1">
+          <Calendar size={14}/>
+          {selectedRound.name} - {selectedRound.date}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 <div className="flex flex-col gap-2">
 <label className="text-xs font-bold text-slate-600 uppercase">Altersklasse</label>
 <select value={plannerAgeGroup} onChange={e => setPlannerAgeGroup(e.target.value as AgeGroup)} className="p-3 border border-slate-300 rounded-lg bg-white text-sm font-medium">
@@ -4644,10 +4789,11 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   </button>
 )}
 </>
-)}
+  );
+})()}
 </div>
 
-{isAdmin && (
+{plannerView === 'fixtures' && isAdmin && (
   <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 space-y-5">
     <div className="flex items-center gap-2 mb-4">
       <UserPlus size={20} className="text-blue-600"/>
@@ -4750,7 +4896,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {(['A','B','C'] as Level[]).map(level => {
   const key = getPlannerKey(plannerAgeGroup, level);
   const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
-  const { stats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level);
+  const { stats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId);
   const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
 
   // Paginierung für Fixtures
@@ -4874,12 +5020,21 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       return (
                         <div className="flex items-center gap-2 bg-green-50 px-2 py-1 rounded">
                           <span className="text-xs font-mono font-bold text-green-700">{savedMatch.score}</span>
-                          <button onClick={() => {
-                            setEditingFixtures(prev => ({ ...prev, [f.id]: true }));
-                            setPlannerScoreInput(prev => ({ ...prev, [f.id]: savedMatch.score }));
-                          }} className="ml-auto p-1 text-blue-600 hover:bg-blue-100 rounded">
-                            <Edit2 size={12}/>
-                          </button>
+                          <div className="ml-auto flex gap-1">
+                            <button onClick={() => {
+                              setEditingFixtures(prev => ({ ...prev, [f.id]: true }));
+                              setPlannerScoreInput(prev => ({ ...prev, [f.id]: savedMatch.score }));
+                            }} className="p-1 text-blue-600 hover:bg-blue-100 rounded" title="Bearbeiten">
+                              <Edit2 size={12}/>
+                            </button>
+                            <button onClick={() => {
+                              if (confirm('Dieses Spiel wirklich löschen?')) {
+                                deletePlannerResult(f);
+                              }
+                            }} className="p-1 text-red-600 hover:bg-red-100 rounded" title="Löschen">
+                              <Trash2 size={12}/>
+                            </button>
+                          </div>
                         </div>
                       );
                     }
@@ -4944,6 +5099,203 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
     </div>
   );
 })}
+
+{/* TABELLEN-ANSICHT */}
+{plannerView === 'standings' && plannerSelectedTournamentId && plannerSelectedRoundId && (() => {
+  const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
+  const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
+
+  if (!selectedTournament || !selectedRound) return null;
+
+  const ageGroups = getSortedAgeGroups().filter(ag => ag !== 'All');
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 p-5 rounded-xl border border-blue-800 shadow-lg">
+        <div className="flex items-center gap-3 text-white">
+          <CalendarDays size={24} className="text-blue-100"/>
+          <div>
+            <div className="text-xs font-semibold text-blue-200 uppercase tracking-wide">Aktuelle Auswahl</div>
+            <div className="text-xl font-bold">{selectedTournament.name}</div>
+            <div className="text-sm text-blue-100 flex items-center gap-2 mt-1">
+              <Calendar size={14}/>
+              {selectedRound.name} - {selectedRound.date}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {ageGroups.map(ageGroup => {
+        const levels: Level[] = ['A', 'B', 'C'];
+        return levels.map(level => {
+          const groupPlayers = players.filter(p =>
+            calculateAgeGroup(p) === ageGroup && p.level === level
+          );
+          if (groupPlayers.length === 0) return null;
+
+          const standings = groupPlayers.map(player => {
+            const playerResult = results.find(r => r.playerId === player.id && r.tournamentId === selectedTournament.id);
+            if (!playerResult) return { player, points: 0, matches: 0, wins: 0, closeLosses: 0 };
+
+            const roundMatches = playerResult.matches.filter(m => m.roundId === selectedRound.id);
+            let points = 0, wins = 0, closeLosses = 0;
+
+            if (roundMatches.length > 0) points += 1;
+
+            const weight = getGroupSizeWeight(groupPlayers.length);
+            roundMatches.forEach(match => {
+              const analysis = analyzeSingleScore(match.score);
+              if (analysis.isWin) { points += 2 * weight; wins++; }
+              else if (analysis.isCloseLoss) { points += 1 * weight; closeLosses++; }
+            });
+
+            return { player, points: parseFloat(points.toFixed(2)), matches: roundMatches.length, wins, closeLosses };
+          }).sort((a, b) => b.points - a.points);
+
+          return (
+            <div key={`${ageGroup}-${level}`} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
+                <Trophy size={16} className="text-amber-500"/>
+                {displayAgeGroup(ageGroup)} - Klasse {level}
+                <span className="text-xs text-slate-500 font-normal ml-auto">
+                  {groupPlayers.length} Spieler | Gewichtung: {getGroupSizeWeight(groupPlayers.length)}
+                </span>
+              </h4>
+              <div className="space-y-2">
+                {standings.map((standing, idx) => {
+                  const playerResult = results.find(r => r.playerId === standing.player.id && r.tournamentId === selectedTournament.id);
+                  const roundMatches = playerResult?.matches.filter(m => m.roundId === selectedRound.id) || [];
+                  const isExpanded = expandedPlayerId === standing.player.id;
+
+                  return (
+                    <div key={standing.player.id}>
+                      <div className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:shadow-md transition ${
+                          idx === 0 ? 'bg-amber-100 border border-amber-300' :
+                          idx === 1 ? 'bg-slate-100 border border-slate-300' :
+                          idx === 2 ? 'bg-orange-100 border border-orange-300' : 'bg-white border border-slate-200'
+                        }`} onClick={() => setExpandedPlayerId(isExpanded ? null : standing.player.id)}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                          idx === 0 ? 'bg-amber-500 text-white' :
+                          idx === 1 ? 'bg-slate-400 text-white' :
+                          idx === 2 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-bold text-slate-800">{standing.player.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {standing.matches} Spiele | {standing.wins} Siege | {standing.closeLosses} Knappe Niederlagen
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-emerald-600">{standing.points}</div>
+                          <div className="text-[10px] text-slate-500 uppercase">Punkte</div>
+                        </div>
+                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}/>
+                      </div>
+
+                      {isExpanded && roundMatches.length > 0 && (
+                        <div className="ml-12 mt-2 space-y-2 bg-white p-3 rounded-lg border border-slate-200">
+                          <div className="text-xs font-bold text-slate-600 uppercase mb-2">Spiele dieses Spieltags</div>
+                          {roundMatches.map(match => {
+                            const isEditing = editingMatchId === match.id;
+                            const opponent = players.find(p => p.id === match.opponentId);
+
+                            return (
+                              <div key={match.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
+                                <div className="flex-1 text-sm">
+                                  <span className="font-medium">{standing.player.name}</span>
+                                  <span className="text-slate-400 mx-1">vs</span>
+                                  <span className="font-medium">{opponent?.name || 'Unbekannt'}</span>
+                                </div>
+                                {isEditing ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      value={editMatchScore}
+                                      onChange={e => setEditMatchScore(e.target.value)}
+                                      className="w-24 px-2 py-1 border rounded text-sm"
+                                      placeholder="6:4 6:2"
+                                    />
+                                    <button onClick={() => {
+                                      // Speichere geänderten Score
+                                      if (editMatchScore.trim() && playerResult) {
+                                        const updatedResults = results.map(r => {
+                                          if (r.playerId === standing.player.id && r.tournamentId === selectedTournament.id) {
+                                            return {
+                                              ...r,
+                                              matches: r.matches.map(m => {
+                                                if (m.id === match.id) {
+                                                  const analysis = analyzeSingleScore(editMatchScore.trim());
+                                                  return { ...m, score: editMatchScore.trim(), isWin: analysis.isWin, isCloseLoss: analysis.isCloseLoss };
+                                                }
+                                                return m;
+                                              })
+                                            };
+                                          }
+                                          // Update auch Gegner-Match
+                                          if (r.playerId === match.opponentId && r.tournamentId === selectedTournament.id) {
+                                            return {
+                                              ...r,
+                                              matches: r.matches.map(m => {
+                                                if (m.opponentId === standing.player.id && m.roundId === match.roundId) {
+                                                  const reversedScore = reverseScoreString(editMatchScore.trim());
+                                                  const analysis = analyzeSingleScore(reversedScore);
+                                                  return { ...m, score: reversedScore, isWin: analysis.isWin, isCloseLoss: analysis.isCloseLoss };
+                                                }
+                                                return m;
+                                              })
+                                            };
+                                          }
+                                          return r;
+                                        });
+                                        updateResults(updatedResults);
+                                        setEditingMatchId(null);
+                                        setEditMatchScore('');
+                                        addToast('Ergebnis aktualisiert', 'success');
+                                      }
+                                    }} className="p-1 text-green-600 hover:bg-green-100 rounded">
+                                      <Check size={14}/>
+                                    </button>
+                                    <button onClick={() => {
+                                      setEditingMatchId(null);
+                                      setEditMatchScore('');
+                                    }} className="p-1 text-slate-600 hover:bg-slate-100 rounded">
+                                      <X size={14}/>
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className={`text-sm font-mono font-bold ${match.isWin ? 'text-green-600' : match.isCloseLoss ? 'text-orange-600' : 'text-red-600'}`}>
+                                      {match.score}
+                                    </span>
+                                    {isAdmin && (
+                                      <button onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingMatchId(match.id);
+                                        setEditMatchScore(match.score);
+                                      }} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
+                                        <Edit2 size={12}/>
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        }).filter(Boolean);
+      })}
+    </div>
+  );
+})()}
 
 </div>
 )}
@@ -5138,14 +5490,9 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 )}
 
-
-{/* ... OTHER TABS ... */}
-
 {activeTab === 'register' && (
 
 <div className="max-w-xl mx-auto animate-in fade-in">
-
-{/* ... (Existing Register Code) ... */}
 
 <div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-lg text-center">
 
@@ -5159,7 +5506,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 
 {!showRegSuccess ? (
-
+<>
 <div className="space-y-4 text-left">
 
 <div>
@@ -5192,7 +5539,45 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 <input type="date" value={regBirthDate} onChange={e => setRegBirthDate(e.target.value)} className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"/>
 
-<div className="text-xs text-slate-500 mt-1">Altersklasse (automatisch): <span className="font-bold text-emerald-600">{regPreviewAge}</span> â€“ anhand des Geburtsdatums</div>
+<div className="text-xs text-slate-500 mt-1">Altersklasse (automatisch): <span className="font-bold text-emerald-600">{regPreviewAge}</span> – anhand des Geburtsdatums</div>
+
+{isAdmin && (
+<div className="bg-slate-50 border border-dashed border-emerald-200 rounded-lg p-3 mt-2">
+<div className="flex items-center justify-between text-[11px] font-bold text-slate-600 uppercase">
+<span>Manuelle Zuordnung</span>
+<button
+ type="button"
+ onClick={() => setRegAllowAgeOverride(prev => {
+   const next = !prev;
+   if (!next) {
+     setRegManualAgeGroup('');
+   } else {
+     setRegManualAgeGroup(regAutoAgeGroup || 'Yellow');
+   }
+   return next;
+ })}
+ disabled={!regBirthDate}
+ className={`text-xs font-bold ${regAllowAgeOverride ? 'text-red-500 hover:underline' : 'text-emerald-600 hover:underline'} disabled:text-slate-300`}
+>
+ {regAllowAgeOverride ? 'Automatik nutzen' : 'Andere Klasse wählen'}
+</button>
+</div>
+<p className="text-[11px] text-slate-500 mt-1">Standard ist die automatisch ermittelte Altersklasse. Nur ändern, wenn ein Spieler bewusst höher spielen soll.</p>
+{regAllowAgeOverride && (
+<select
+ value={regManualAgeGroup || regAutoAgeGroup || 'Yellow'}
+ onChange={e => setRegManualAgeGroup(e.target.value as AgeGroup)}
+ className="mt-2 w-full p-2 border rounded bg-white text-sm"
+>
+ {AGE_GROUP_ORDER.map(group => (
+   <option key={group} value={group}>{displayAgeGroup(group)}</option>
+ ))}
+</select>
+)}
+</div>
+)}
+
+</div>
 
 </div>
 
@@ -5281,7 +5666,44 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 </button>
 
+{isAdmin && (
+<div className="mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
+<div className="flex flex-wrap items-center gap-2 justify-between mb-3">
+<h3 className="font-bold text-slate-700 flex items-center gap-2"><Users size={16}/> Bestehende Spieler</h3>
+<span className="text-xs text-slate-500">{registrationPlayersPreview.length} Spieler</span>
 </div>
+<div className="flex flex-wrap gap-2 mb-3">
+<select value={regPlayersAgeFilter} onChange={e => setRegPlayersAgeFilter(e.target.value as AgeGroup | 'All')} className="flex-1 min-w-[120px] p-2 border rounded text-xs bg-white">
+<option value="All">Alle Altersklassen</option>
+{AGE_GROUP_ORDER.map(group => <option key={group} value={group}>{displayAgeGroup(group)}</option>)}
+</select>
+<select value={regPlayersLevelFilter} onChange={e => setRegPlayersLevelFilter(e.target.value as Level | 'All')} className="flex-1 min-w-[120px] p-2 border rounded text-xs bg-white">
+<option value="All">Alle Level</option>
+<option value="A">{LEVEL_LABELS.A}</option>
+<option value="B">{LEVEL_LABELS.B}</option>
+<option value="C">{LEVEL_LABELS.C}</option>
+</select>
+<input type="text" value={regPlayersSearch} onChange={e => setRegPlayersSearch(e.target.value)} className="flex-1 min-w-[160px] p-2 border rounded text-xs bg-white" placeholder="Spieler suchen..."/>
+</div>
+<div className="max-h-64 overflow-y-auto divide-y divide-slate-200 bg-white rounded-lg border border-slate-100">
+{registrationPlayersPreview.length === 0 ? (
+<div className="p-4 text-center text-xs text-slate-400">Keine Spieler gefunden.</div>
+) : registrationPlayersPreview.map(p => (
+<div key={p.id} className="px-4 py-3 flex items-center justify-between gap-4 text-xs">
+<div>
+<div className="font-bold text-slate-700 text-sm">{p.name}</div>
+<div className="text-slate-500">{displayAgeGroup(calculateAgeGroup(p))} • Level {p.level || '?'}</div>
+</div>
+<div className="text-right text-slate-400">
+{new Date(p.birthDate).toLocaleDateString('de-DE')}
+</div>
+</div>
+))}
+</div>
+</div>
+)}
+
+</>
 
 ) : (
 
@@ -5302,10 +5724,6 @@ className="w-4 h-4 text-emerald-600 rounded"
 </div>
 
 )}
-
-
-
-{/* ... INPUT & ADMIN TABS FROM PREVIOUS ... */}
 
 {activeTab === 'input' && isAdmin && (
 
@@ -5554,140 +5972,9 @@ className="w-full mb-1 p-1 text-xs border rounded"
 
 </div>
 
-{/* TABELLEN-ANSICHT */}
-{plannerView === 'standings' && (() => {
-  const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
-  const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
-
-  if (!selectedTournament || !selectedRound) {
-    return (
-      <div className="bg-slate-50 p-8 rounded-xl border border-slate-200 text-center">
-        <CalendarDays size={32} className="mx-auto text-slate-400 mb-3"/>
-        <p className="text-slate-600">Bitte wähle ein Turnier und einen Spieltag aus.</p>
-      </div>
-    );
-  }
-
-  // Berechne Ranglisten für diesen Spieltag
-  const ageGroups = getSortedAgeGroups().filter(ag => ag !== 'All');
-
-  return (
-    <div className="space-y-6">
-      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <div className="font-bold text-blue-900">{selectedTournament.name}</div>
-        <div className="text-sm text-blue-700">{selectedRound.name} - {selectedRound.date}</div>
-      </div>
-
-      {ageGroups.map(ageGroup => {
-        const levels: Level[] = ['A', 'B', 'C'];
-
-        return levels.map(level => {
-          // Filter Spieler für diese Gruppe
-          const groupPlayers = players.filter(p =>
-            calculateAgeGroup(p) === ageGroup && p.level === level
-          );
-
-          if (groupPlayers.length === 0) return null;
-
-          // Berechne Punkte für diese Gruppe und diesen Spieltag
-          const standings = groupPlayers.map(player => {
-            const playerResult = results.find(r => r.playerId === player.id);
-            if (!playerResult) return { player, points: 0, matches: 0, wins: 0, closeLosses: 0 };
-
-            // Filtere nur Matches von diesem Spieltag
-            const roundMatches = playerResult.matches.filter(m => m.roundId === selectedRound.id);
-
-            let points = 0;
-            let wins = 0;
-            let closeLosses = 0;
-
-            // Teilnahmepunkt (ungewichtet)
-            if (roundMatches.length > 0) points += 1;
-
-            // Spielpunkte (gewichtet)
-            const participantCount = groupPlayers.length;
-            const weight = getGroupSizeWeight(participantCount);
-
-            roundMatches.forEach(match => {
-              const analysis = analyzeSingleScore(match.score);
-              if (analysis.isWin) {
-                points += 2 * weight;
-                wins++;
-              } else if (analysis.isCloseLoss) {
-                points += 1 * weight;
-                closeLosses++;
-              }
-            });
-
-            return {
-              player,
-              points: parseFloat(points.toFixed(2)),
-              matches: roundMatches.length,
-              wins,
-              closeLosses
-            };
-          }).sort((a, b) => b.points - a.points);
-
-          return (
-            <div key={`${ageGroup}-${level}`} className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <h4 className="font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <Trophy size={16} className="text-amber-500"/>
-                {displayAgeGroup(ageGroup)} - Klasse {level}
-                <span className="text-xs text-slate-500 font-normal ml-auto">
-                  {groupPlayers.length} Spieler | Gewichtung: {getGroupSizeWeight(groupPlayers.length)}
-                </span>
-              </h4>
-
-              <div className="space-y-2">
-                {standings.map((standing, idx) => (
-                  <div
-                    key={standing.player.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:shadow-md transition ${
-                      idx === 0 ? 'bg-amber-100 border border-amber-300' :
-                      idx === 1 ? 'bg-slate-100 border border-slate-300' :
-                      idx === 2 ? 'bg-orange-100 border border-orange-300' :
-                      'bg-white border border-slate-200'
-                    }`}
-                    onClick={() => {
-                      setSelectedPlayerId(standing.player.id);
-                    }}
-                  >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
-                      idx === 0 ? 'bg-amber-500 text-white' :
-                      idx === 1 ? 'bg-slate-400 text-white' :
-                      idx === 2 ? 'bg-orange-500 text-white' :
-                      'bg-slate-200 text-slate-600'
-                    }`}>
-                      {idx + 1}
-                    </div>
-
-                    <div className="flex-1">
-                      <div className="font-bold text-slate-800">{standing.player.name}</div>
-                      <div className="text-xs text-slate-500">
-                        {standing.matches} Spiele | {standing.wins} Siege | {standing.closeLosses} Knappe Niederlagen
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-emerald-600">{standing.points}</div>
-                      <div className="text-[10px] text-slate-500 uppercase">Punkte</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }).filter(Boolean);
-      })}
-    </div>
-  );
-})()}
-
 </div>
 
 )}
-
-
 
 {activeTab === 'admin' && isAdmin && (
 
@@ -6009,8 +6296,6 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 </div>
 
 )}
-
-
 
 </div>
 
