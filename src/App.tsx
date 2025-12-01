@@ -132,7 +132,9 @@ id: string;
 
 name: string;
 
-birthDate: string;
+birthDate?: string;
+
+ageGroup?: AgeGroup;
 
 level?: Level;
 manualAgeGroup?: AgeGroup;
@@ -144,6 +146,7 @@ isTestData?: boolean;
 isTeam?: boolean;
 
 memberIds?: string[];
+  teamMembers?: string[];
 
 };
 
@@ -300,6 +303,8 @@ type PlannedMatch = {
   round: number;
   p1Id: string;
   p2Id: string;
+  court?: string; // Court-Nummer oder Name (z.B. "Court 1", "Platz A")
+  time?: string;  // Spielzeit (z.B. "10:00", "14:30")
 };
 
 
@@ -364,7 +369,562 @@ PLANNER: 'tm_planner_fixtures'
 
 };
 
+// --- CSV IMPORT/EXPORT HELPERS ---
+const exportPlayersToCSV = (players: Player[]) => {
+  // CSV Header
+  const headers = ['Name', 'Verein', 'Email', 'Geburtsdatum', 'Altersklasse', 'Level', 'Ist Team'];
 
+  // CSV Rows
+  const rows = players.map(p => [
+    p.name,
+    p.club || '',
+    p.email || '',
+    p.birthDate || '',
+    p.ageGroup || '',
+    p.level || '',
+    p.isTeam ? 'Ja' : 'Nein'
+  ]);
+
+  // Kombiniere Headers und Rows
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+  ].join('\n');
+
+  // Download-Trigger
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM für Excel
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `spieler_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const importPlayersFromCSV = (file: File, existingPlayers: Player[]): Promise<Player[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+          reject(new Error('CSV-Datei ist leer oder ungültig'));
+          return;
+        }
+
+        // Überspringe Header (erste Zeile)
+        const dataLines = lines.slice(1);
+
+        const newPlayers: Player[] = [];
+
+        dataLines.forEach((line) => {
+          // Parse CSV-Zeile (berücksichtige Anführungszeichen)
+          const values = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
+
+          if (values.length >= 6) {
+            const [name, club, email, birthDate, ageGroup, level, isTeamStr] = values;
+
+            // Prüfe ob Spieler bereits existiert (nach Name)
+            const exists = existingPlayers.some(p => p.name.toLowerCase() === name.toLowerCase());
+
+            if (!exists && name) {
+              newPlayers.push({
+                id: generateId(),
+                name,
+                club: club || undefined,
+                email: email || undefined,
+                birthDate: birthDate || undefined,
+                ageGroup: (ageGroup as AgeGroup) || undefined,
+                level: (level as Level) || 'C',
+                isTeam: isTeamStr?.toLowerCase() === 'ja' || isTeamStr?.toLowerCase() === 'yes',
+                teamMembers: []
+              });
+            }
+          }
+        });
+
+        resolve(newPlayers);
+      } catch (error) {
+        reject(new Error('Fehler beim Parsen der CSV-Datei'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Fehler beim Lesen der Datei'));
+    reader.readAsText(file, 'UTF-8');
+  });
+};
+
+// --- PRINT HELPERS ---
+const printMatchSchedule = (
+  level: Level,
+  ageGroup: AgeGroup,
+  fixtures: PlannedMatch[],
+  stats: any[],
+  players: Player[],
+  tournamentName: string,
+  roundName: string
+) => {
+  const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
+
+  const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spielplan - ${level} - ${ageGroup}</title>
+  <style>
+    @media print {
+      @page { margin: 1.5cm; }
+      body { margin: 0; }
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      background: white;
+      color: black;
+      font-size: 11px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #10b981;
+      padding-bottom: 10px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+      color: #10b981;
+    }
+    .header p {
+      margin: 3px 0;
+      font-size: 11px;
+      color: #666;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #334155;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 5px;
+    }
+    .fixtures-container {
+      column-count: 2;
+      column-gap: 15px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    th, td {
+      padding: 5px 8px;
+      text-align: left;
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: bold;
+      color: #334155;
+    }
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .fixture-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      padding: 4px 6px;
+      margin-bottom: 3px;
+      page-break-inside: avoid;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+    }
+    .fixture-round {
+      min-width: 45px;
+      font-size: 9px;
+      font-weight: bold;
+      color: #64748b;
+    }
+    .fixture-match {
+      flex: 1;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .fixture-details {
+      display: flex;
+      gap: 6px;
+      font-size: 9px;
+      color: #64748b;
+      min-width: 60px;
+      justify-content: flex-end;
+    }
+    .rank-badge {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      line-height: 22px;
+      text-align: center;
+      border-radius: 50%;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .rank-1 { background: #fbbf24; color: #78350f; }
+    .rank-2 { background: #d1d5db; color: #1f2937; }
+    .rank-3 { background: #fb923c; color: #7c2d12; }
+    .rank-other { background: #e2e8f0; color: #475569; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Spielplan - ${level} - ${ageGroup}</h1>
+    <p><strong>${tournamentName}</strong> • ${roundName}</p>
+    <p>Erstellt am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
+  </div>
+
+  <div class="section">
+    <h2>📋 Rangliste</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 50px; text-align: center;">Platz</th>
+          <th>Name</th>
+          <th style="width: 80px; text-align: center;">Teiln.</th>
+          <th style="width: 60px; text-align: center;">S</th>
+          <th style="width: 60px; text-align: center;">KN</th>
+          <th style="width: 60px; text-align: center;">N</th>
+          <th style="width: 100px; text-align: right;">Punkte</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${stats.map((s, idx) => `
+          <tr>
+            <td style="text-align: center;">
+              <span class="rank-badge ${idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-other'}">
+                ${idx + 1}
+              </span>
+            </td>
+            <td><strong>${s.player.name}</strong></td>
+            <td style="text-align: center;">${s.participationPoints}</td>
+            <td style="text-align: center;">${s.wins}</td>
+            <td style="text-align: center;">${s.close}</td>
+            <td style="text-align: center;">${s.losses}</td>
+            <td style="text-align: right;"><strong>${s.points.toFixed(1)} Pkt</strong></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>🎾 Spielpaarungen (${fixtures.length} Spiele)</h2>
+    <div class="fixtures-container">
+      ${fixtures.map(f => `
+        <div class="fixture-card">
+          <div class="fixture-round">Runde ${f.round}</div>
+          <div class="fixture-match">
+            ${resolveName(f.p1Id)} <span style="color: #94a3b8;">vs</span> ${resolveName(f.p2Id)}
+          </div>
+          <div class="fixture-details">
+            ${f.time ? `<span>🕐 ${f.time}</span>` : '<span style="opacity: 0.3;">🕐 —</span>'}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+</body>
+</html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
+};
+
+const printAllGroupsSchedule = (
+  ageGroup: AgeGroup,
+  allGroupsData: Array<{
+    level: Level;
+    fixtures: PlannedMatch[];
+    stats: any[];
+  }> ,
+  players: Player[],
+  tournamentName: string,
+  roundName: string
+) => {
+  const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
+
+  const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Spielplan - Alle Gruppen - ${ageGroup}</title>
+  <style>
+    @media print {
+      @page { margin: 1.5cm; }
+      body { margin: 0; }
+      .page-break { page-break-before: always; }
+    }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      background: white;
+      color: black;
+      font-size: 11px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #10b981;
+      padding-bottom: 10px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 22px;
+      color: #10b981;
+    }
+    .header p {
+      margin: 3px 0;
+      font-size: 11px;
+      color: #666;
+    }
+    .group-section {
+      margin-bottom: 30px;
+    }
+    .group-title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #334155;
+      margin-bottom: 15px;
+      padding: 8px 12px;
+      background: #f1f5f9;
+      border-left: 4px solid #10b981;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #334155;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 5px;
+    }
+    .fixtures-container {
+      column-count: 2;
+      column-gap: 15px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    th, td {
+      padding: 5px 8px;
+      text-align: left;
+      border: 1px solid #e2e8f0;
+      font-size: 11px;
+    }
+    th {
+      background: #f1f5f9;
+      font-weight: bold;
+      color: #334155;
+    }
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+    .fixture-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      padding: 4px 6px;
+      margin-bottom: 3px;
+      page-break-inside: avoid;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+    }
+    .fixture-round {
+      min-width: 45px;
+      font-size: 9px;
+      font-weight: bold;
+      color: #64748b;
+    }
+    .fixture-match {
+      flex: 1;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .fixture-details {
+      display: flex;
+      gap: 6px;
+      font-size: 9px;
+      color: #64748b;
+      min-width: 60px;
+      justify-content: flex-end;
+    }
+    .rank-badge {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      line-height: 22px;
+      text-align: center;
+      border-radius: 50%;
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .rank-1 { background: #fbbf24; color: #78350f; }
+    .rank-2 { background: #d1d5db; color: #1f2937; }
+    .rank-3 { background: #fb923c; color: #7c2d12; }
+    .rank-other { background: #e2e8f0; color: #475569; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Spielplan - Alle Gruppen - ${ageGroup}</h1>
+    <p><strong>${tournamentName}</strong> • ${roundName}</p>
+    <p>Erstellt am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}</p>
+  </div>
+
+  ${allGroupsData.map((groupData, idx) => `
+    ${idx > 0 ? '<div class="page-break"></div>' : ''}
+    <div class="group-section">
+      <div class="group-title">Level ${groupData.level}</div>
+
+      <div class="section">
+        <h2>📋 Rangliste</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 50px; text-align: center;">Platz</th>
+              <th>Name</th>
+              <th style="width: 80px; text-align: center;">Teiln.</th>
+              <th style="width: 60px; text-align: center;">S</th>
+              <th style="width: 60px; text-align: center;">KN</th>
+              <th style="width: 60px; text-align: center;">N</th>
+              <th style="width: 100px; text-align: right;">Punkte</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${groupData.stats.map((s, idx) => `
+              <tr>
+                <td style="text-align: center;">
+                  <span class="rank-badge ${idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-other'}">
+                    ${idx + 1}
+                  </span>
+                </td>
+                <td><strong>${s.player.name}</strong></td>
+                <td style="text-align: center;">${s.participationPoints}</td>
+                <td style="text-align: center;">${s.wins}</td>
+                <td style="text-align: center;">${s.close}</td>
+                <td style="text-align: center;">${s.losses}</td>
+                <td style="text-align: right;"><strong>${s.points.toFixed(1)} Pkt</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>🎾 Spielpaarungen (${groupData.fixtures.length} Spiele)</h2>
+        <div class="fixtures-container">
+          ${groupData.fixtures.map(f => `
+            <div class="fixture-card">
+              <div class="fixture-round">Runde ${f.round}</div>
+              <div class="fixture-match">
+                ${resolveName(f.p1Id)} <span style="color: #94a3b8;">vs</span> ${resolveName(f.p2Id)}
+              </div>
+              <div class="fixture-details">
+                ${f.time ? `<span>🕐 ${f.time}</span>` : '<span style="opacity: 0.3;">🕐 —</span>'}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `).join('')}
+</body>
+</html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  }
+};
+
+// --- BACKUP & RESTORE HELPERS ---
+const exportBackup = (data: {
+  players: Player[];
+  tournaments: Tournament[];
+  results: TournamentResult[];
+  plannerFixtures: Record<string, PlannedMatch[]>;
+  groupMatchModes: Record<string, string>;
+  customGroupWeights: Record<string, number>;
+}) => {
+  const backup = {
+    version: '1.0',
+    timestamp: new Date().toISOString(),
+    data
+  };
+
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `tennis_manager_backup_${new Date().toISOString().split('T')[0]}.json`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const importBackup = (file: File): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const backup = JSON.parse(text);
+
+        if (!backup.version || !backup.data) {
+          reject(new Error('Ungültiges Backup-Format'));
+          return;
+        }
+
+        resolve(backup.data);
+      } catch (error) {
+        reject(new Error('Fehler beim Lesen der Backup-Datei'));
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Fehler beim Lesen der Datei'));
+    reader.readAsText(file, 'UTF-8');
+  });
+};
 
 const TennisManager = () => {
 
@@ -3511,7 +4071,7 @@ return (
 
 <select value={editPlayerAgeGroup} onChange={e => setEditPlayerAgeGroup(e.target.value as AgeGroup | 'auto')} className={`w-full p-2 border rounded text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 
-<option value="auto">Automatisch ({formatAgeGroupLabel(calculateAgeGroup(viewingPlayer.birthDate))})</option>
+<option value="auto">Automatisch ({formatAgeGroupLabel(calculateAgeGroup(viewingPlayer))})</option>
 
 {AGE_GROUP_ORDER.map(g => (
 
@@ -4794,7 +5354,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 <div className={`rounded-xl shadow-sm border p-4 md:p-6 flex flex-col gap-3 md:gap-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
 <div className="flex flex-col gap-3 md:gap-4">
 <div>
-<h2 className={`text-lg md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-emerald-600" size={16} className="md:w-[18px] md:h-[18px]"/> Spielplan nach Turniertag & Alters-/Leistungsklasse</h2>
+<h2 className={`text-lg md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-emerald-600 w-4 h-4 md:w-[18px] md:h-[18px]" size={16} /> Spielplan nach Turniertag & Alters-/Leistungsklasse</h2>
 <p className={`text-xs md:text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Wähle einen Turniertag und lose pro Level aus. Der Spielmodus kann für jede Gruppe einzeln festgelegt werden.</p>
 </div>
 <div className="flex flex-col gap-3 w-full">
@@ -4861,6 +5421,40 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
     <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
       <Shuffle size={16} className="md:w-[18px] md:h-[18px]"/> Alle Leistungsklassen auslosen
     </button>
+
+    <button
+      onClick={() => {
+        const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
+        const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
+
+        // Sammle Daten für alle drei Levels
+        const allGroupsData = (['A', 'B', 'C'] as Level[]).map(level => {
+          const key = getPlannerKey(plannerAgeGroup, level);
+          const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
+          const { stats: unsortedStats } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId, fixtures);
+          const stats = unsortedStats.slice().sort((a, b) => b.points - a.points);
+
+          return { level, fixtures, stats };
+        }).filter(group => group.fixtures.length > 0 || group.stats.length > 0); // Nur Gruppen mit Daten
+
+        if (allGroupsData.length === 0) {
+          addToast('Keine Daten zum Drucken vorhanden', 'info');
+          return;
+        }
+
+        printAllGroupsSchedule(
+          plannerAgeGroup,
+          allGroupsData,
+          players,
+          selectedTournament?.name || 'Turnier',
+          selectedRound?.name + ' - ' + selectedRound?.date || 'Spieltag'
+        );
+      }}
+      className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+    >
+      <ClipboardList size={16} className="md:w-[18px] md:h-[18px]"/> Alle Gruppen drucken
+    </button>
+
     <button
       onClick={() => {
         setConfirmDialog({
@@ -5202,6 +5796,26 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             >
               <Trash2 size={10} className="md:w-3 md:h-3"/> Gruppe löschen
             </button>
+
+            <button
+              onClick={() => {
+                const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
+                const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
+                printMatchSchedule(
+                  level,
+                  plannerAgeGroup,
+                  fixtures,
+                  stats,
+                  players,
+                  selectedTournament?.name || 'Turnier',
+                  selectedRound?.name + ' - ' + selectedRound?.date || 'Spieltag'
+                );
+              }}
+              className="px-2 md:px-3 py-1 md:py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-xs font-bold rounded flex items-center justify-center gap-1"
+              title="Spielplan drucken"
+            >
+              <ClipboardList size={10} className="md:w-3 md:h-3"/> Drucken
+            </button>
           </div>
         )}
       </div>
@@ -5344,6 +5958,36 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                     {' '}<span className="text-slate-400 dark:text-slate-500 mx-2">vs</span>{' '}
                     <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p2Id) || null)}>{resolveName(f.p2Id)}</span>
                   </div>
+
+                  {/* Zeit-Planung */}
+                  {isAdmin && (
+                    <div className="mb-3">
+                      <label className={`text-[10px] font-bold uppercase mb-1 block ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                        Uhrzeit
+                      </label>
+                      <input
+                        type="time"
+                        value={f.time || ''}
+                        onChange={(e) => {
+                          const updated = (plannerFixtures[key] || []).map(fix =>
+                            fix.id === f.id ? { ...fix, time: e.target.value } : fix
+                          );
+                          setPlannerFixtures(prev => ({ ...prev, [key]: updated }));
+                        }}
+                        className={`w-full px-2 py-1.5 text-sm border rounded transition-colors ${darkMode ? 'bg-slate-800 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}
+                      />
+                    </div>
+                  )}
+
+                  {/* Anzeige für nicht-Admins */}
+                  {!isAdmin && f.time && (
+                    <div className={`flex items-center gap-3 mb-3 text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <span className={`flex items-center gap-1 px-2 py-1 rounded ${darkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                        <CalendarDays size={12} />
+                        {f.time} Uhr
+                      </span>
+                    </div>
+                  )}
                   {isAdmin && (() => {
                     // Prüfe ob Match bereits gespeichert wurde
                     const p1Result = results.find(r => r.playerId === f.p1Id);
@@ -5478,12 +6122,50 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 </select>
 
 {isAdmin && (
+  <>
+    <button
+      onClick={() => exportPlayersToCSV(players)}
+      className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-emerald-700"
+      title="Spielerliste als CSV exportieren"
+    >
+      <Database size={16}/> Export CSV
+    </button>
 
-<button onClick={() => setIsCreatingTeam(!isCreatingTeam)} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700">
+    <button
+      onClick={() => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.csv';
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (file) {
+            try {
+              const newPlayers = await importPlayersFromCSV(file, players);
+              if (newPlayers.length > 0) {
+                setPlayers([...players, ...newPlayers]);
+                addToast(`${newPlayers.length} Spieler importiert`, 'success');
+              } else {
+                addToast('Keine neuen Spieler zum Importieren gefunden', 'info');
+              }
+            } catch (error) {
+              addToast((error as Error).message, 'error');
+            }
+          }
+        };
+        input.click();
+      }}
+      className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-700"
+      title="Spieler aus CSV importieren"
+    >
+      <Database size={16}/> Import CSV
+    </button>
+
+    <button onClick={() => setIsCreatingTeam(!isCreatingTeam)} className="bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-purple-700">
 
 {isCreatingTeam ? <X size={16}/> : <Plus size={16}/>} Neues Doppel-Team
 
 </button>
+  </>
 
 )}
 
@@ -5846,7 +6528,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 <div className="text-slate-500">{displayAgeGroup(calculateAgeGroup(p))} • Level {p.level || '?'}</div>
 </div>
 <div className="text-right text-slate-400">
-{new Date(p.birthDate).toLocaleDateString('de-DE')}
+{p.birthDate ? new Date(p.birthDate).toLocaleDateString('de-DE') : '-'}
 </div>
 </div>
 ))}
@@ -6166,6 +6848,81 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 ))}
 
+</div>
+
+</div>
+
+{/* BACKUP & RESTORE */}
+
+<div className={`p-6 rounded-xl border transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+
+<h3 className={`font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><HardDrive className="text-orange-500"/> Datensicherung</h3>
+
+<p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+  Sichere alle Daten (Spieler, Turniere, Ergebnisse, Spielpläne) oder stelle sie aus einem Backup wieder her.
+</p>
+
+<div className="flex flex-col sm:flex-row gap-3">
+  <button
+    onClick={() => {
+      exportBackup({
+        players,
+        tournaments,
+        results,
+        plannerFixtures,
+        groupMatchModes,
+        customGroupWeights
+      });
+      addToast('Backup erfolgreich exportiert', 'success');
+    }}
+    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition"
+  >
+    <Database size={18}/> Backup erstellen
+  </button>
+
+  <button
+    onClick={() => {
+      setConfirmDialog({
+        isOpen: true,
+        message: 'Backup wiederherstellen? ALLE aktuellen Daten werden überschrieben!',
+        onConfirm: () => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.onchange = async (e) => {
+            const file = (e.target as HTMLInputElement).files?.[0];
+            if (file) {
+              try {
+                const data = await importBackup(file);
+
+                // Restore all data
+                if (data.players) setPlayers(data.players);
+                if (data.tournaments) setTournaments(data.tournaments);
+                if (data.results) setResults(data.results);
+                if (data.plannerFixtures) setPlannerFixtures(data.plannerFixtures);
+                if (data.groupMatchModes) setGroupMatchModes(data.groupMatchModes);
+                if (data.customGroupWeights) setCustomGroupWeights(data.customGroupWeights);
+
+                addToast('Backup erfolgreich wiederhergestellt', 'success');
+                closeConfirm();
+              } catch (error) {
+                addToast((error as Error).message, 'error');
+                closeConfirm();
+              }
+            }
+          };
+          input.click();
+        }
+      });
+    }}
+    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition"
+  >
+    <Database size={18}/> Backup wiederherstellen
+  </button>
+</div>
+
+<div className={`mt-4 p-3 rounded-lg border text-xs ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
+  <strong>⚠️ Wichtig:</strong> Das Wiederherstellen eines Backups überschreibt ALLE aktuellen Daten. Erstelle vorher ein aktuelles Backup!
 </div>
 
 </div>
