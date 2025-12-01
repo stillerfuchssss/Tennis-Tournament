@@ -4244,7 +4244,7 @@ className={`border rounded p-1 text-xs w-32 font-mono transition-colors ${darkMo
 
 <div className="space-y-6">
 
-<div className="grid grid-cols-3 gap-4">
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
 
 <div className={`${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'} p-4 rounded-xl border`}>
 
@@ -6572,7 +6572,7 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 </div>
 
-<div className="p-6 space-y-5">
+<div className="p-4 md:p-6 space-y-4 md:space-y-5">
 
 
 {/* Tournament / Round Selection */}
@@ -6581,11 +6581,11 @@ className="w-4 h-4 text-emerald-600 rounded"
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Turnier & Spieltag</label>
+<label className="text-xs md:text-sm font-bold text-slate-600 dark:text-slate-300 uppercase">Turnier & Spieltag</label>
 
-<div className="flex gap-2 mt-1">
+<div className="flex flex-col sm:flex-row gap-2 mt-1">
 
-<select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className={`flex-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}>
+<select value={selectedTournamentId} onChange={(e) => setSelectedTournamentId(e.target.value)} className={`flex-1 p-2.5 md:p-3 text-sm md:text-base border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}>
 
 <option value="">-- Turnierserie wählen --</option>
 
@@ -6599,7 +6599,7 @@ value={selectedRoundId}
 
 onChange={(e) => setSelectedRoundId(e.target.value)}
 
-className={`flex-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 disabled:bg-slate-800 disabled:text-slate-500' : 'bg-slate-50 text-slate-900 border-slate-300 disabled:bg-slate-100 disabled:text-slate-400'} ${roundError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+className={`flex-1 p-2.5 md:p-3 text-sm md:text-base border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 disabled:bg-slate-800 disabled:text-slate-500' : 'bg-slate-50 text-slate-900 border-slate-300 disabled:bg-slate-100 disabled:text-slate-400'} ${roundError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
 
 disabled={!selectedTournamentId}
 
@@ -6636,7 +6636,7 @@ disabled={!selectedTournamentId}
 
 <div className="flex gap-2 flex-wrap items-center">
 
-<select value={inputAgeGroupFilter} onChange={e => setInputAgeGroupFilter(e.target.value)} className="text-xs p-1.5 border rounded transition-colors bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600">
+<select value={inputAgeGroupFilter} onChange={e => setInputAgeGroupFilter(e.target.value)} className="flex-1 min-w-[140px] text-xs md:text-sm p-2 md:p-2.5 border rounded transition-colors bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-600">
 
 <option value="All">Alle Altersklassen</option>
 
@@ -6644,7 +6644,7 @@ disabled={!selectedTournamentId}
 
 </select>
 
-<select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className={`text-xs p-1.5 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
+<select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className={`flex-1 min-w-[140px] text-xs md:text-sm p-2 md:p-2.5 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
 <option value="race4">Zählweise: bis 4</option>
 <option value="race10">Zählweise: bis 10</option>
 <option value="race15">Zählweise: bis 15</option>
@@ -6657,13 +6657,13 @@ disabled={!selectedTournamentId}
 
 
 
-<div className="grid grid-cols-2 gap-4">
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
 {/* Player 1 Selection */}
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Unser Spieler</label>
+<label className="text-xs md:text-sm font-bold text-slate-600 dark:text-slate-300 uppercase">Unser Spieler</label>
 
 <input
 
@@ -6675,11 +6675,11 @@ value={inputPlayerSearch}
 
 onChange={e => setInputPlayerSearch(e.target.value)}
 
-className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
+className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 />
 
-<select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className={`w-full mt-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}>
+<select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className={`w-full mt-1 p-2.5 md:p-3 text-sm md:text-base border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-slate-50 border-slate-300'}`}>
 
 <option value="">-- Wählen --</option>
 
@@ -6704,7 +6704,7 @@ className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode 
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">Gegner wählen</label>
+<label className="text-xs md:text-sm font-bold text-slate-600 dark:text-slate-300 uppercase">Gegner wählen</label>
 
 <input
 
@@ -6716,11 +6716,11 @@ value={inputOpponentSearch}
 
 onChange={e => setInputOpponentSearch(e.target.value)}
 
-className={`w-full mb-1 p-1 text-xs border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
+className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
 
 />
 
-<select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className={`w-full mt-1 p-2.5 border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 focus:bg-slate-600' : 'bg-slate-50 border-slate-300 focus:bg-white'}`}>
+<select value={selectedOpponentId} onChange={(e) => setSelectedOpponentId(e.target.value)} className={`w-full mt-1 p-2.5 md:p-3 text-sm md:text-base border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 focus:bg-slate-600' : 'bg-slate-50 border-slate-300 focus:bg-white'}`}>
 
 <option value="">-- Gegner wählen --</option>
 
