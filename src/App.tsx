@@ -5820,20 +5820,20 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         )}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 overflow-x-auto space-y-3">
-          <table className="w-full text-left">
-            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-[10px] md:text-xs font-bold tracking-wide">
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 w-full overflow-x-auto space-y-3">
+          <table className="w-full text-left min-w-[600px] lg:min-w-full">
+            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-[10px] md:text-xs font-bold tracking-wide sticky top-0 z-5">
               <tr>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16">Platz</th>
-                <th className="px-2 md:px-4 py-2 md:py-3">Name</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16 flex-shrink-0">Platz</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 min-w-[120px] md:min-w-0">Name</th>
                 <th className="px-2 md:px-4 py-2 md:py-3 hidden lg:table-cell">Verein</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-center">Teiln.</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-center">S</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-center hidden sm:table-cell">KN</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-center">N</th>
-                <th className="px-2 md:px-4 py-2 md:py-3 text-right">Punkte</th>
-                {isAdmin && <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16">Aktion</th>}
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center flex-shrink-0">Teiln.</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center flex-shrink-0">S</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center hidden sm:table-cell flex-shrink-0">KN</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center flex-shrink-0">N</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right flex-shrink-0">Punkte</th>
+                {isAdmin && <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16 flex-shrink-0">Aktion</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -5841,7 +5841,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Noch keine Spieler in dieser Leistungsklasse</td></tr>
               ) : stats.map((s, idx) => (
                 <tr key={s.player.id} className={`cursor-pointer transition ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`} onClick={() => setViewingPlayer(s.player)}>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center">
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center flex-shrink-0">
                     <span className={`inline-block w-7 h-7 leading-7 md:w-8 md:h-8 md:leading-8 rounded-full font-bold text-xs md:text-sm shadow-sm ${
                       idx === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900' :
                       idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900' :
@@ -5849,20 +5849,20 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
                     }`}>{idx + 1}</span>
                   </td>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 font-semibold text-xs md:text-base text-emerald-600 dark:text-emerald-400 hover:underline truncate max-w-[100px] sm:max-w-none">{s.player.name}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 font-semibold text-xs md:text-base text-emerald-600 dark:text-emerald-400 hover:underline truncate min-w-0">{s.player.name}</td>
                   <td className="px-2 md:px-4 py-2 md:py-3.5 text-slate-500 dark:text-slate-400 text-xs md:text-sm hidden lg:table-cell">{s.player.club || '-'}</td>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-slate-700 dark:text-slate-300">{s.participationPoints}</td>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-green-600 dark:text-green-400">{s.wins}</td>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-orange-600 dark:text-orange-400 hidden sm:table-cell">{s.close}</td>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-red-600 dark:text-red-400">{s.losses}</td>
-                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-right">
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-slate-700 dark:text-slate-300 flex-shrink-0">{s.participationPoints}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-green-600 dark:text-green-400 flex-shrink-0">{s.wins}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-orange-600 dark:text-orange-400 hidden sm:table-cell flex-shrink-0">{s.close}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-red-600 dark:text-red-400 flex-shrink-0">{s.losses}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-right flex-shrink-0">
                     <span className="text-base md:text-xl font-black bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 bg-clip-text text-transparent">
                       {s.points.toFixed(1)}
                     </span>
                     <span className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 ml-1">Pkt</span>
                   </td>
                   {isAdmin && (
-                    <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
+                    <td className="px-4 py-3.5 text-center flex-shrink-0" onClick={e => e.stopPropagation()}>
                       <button
                         onClick={() => {
                           setConfirmDialog({
@@ -5914,7 +5914,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             </tbody>
           </table>
         </div>
-        <div className={`border rounded-xl p-3 md:p-4 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+        <div className={`w-full border rounded-xl p-3 md:p-4 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex justify-between items-center mb-3 md:mb-4">
             <span className="text-xs md:text-sm font-bold uppercase tracking-wide ${darkMode ? 'text-slate-200' : 'text-slate-700'}">Auslosung</span>
             <span className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-400' : 'bg-white text-slate-500'}`}>{fixtures.length} geplant</span>
@@ -6816,17 +6816,17 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 
 {/* ADMIN ACCOUNT MANAGEMENT */}
 
-<div className="bg-slate-800 text-white rounded-xl p-6 shadow-xl">
+<div className="bg-slate-800 text-white rounded-xl p-4 md:p-6 shadow-xl">
 
-<h3 className="font-bold mb-4 flex items-center gap-2 text-emerald-400"><UserCog size={20}/> Admin Konten</h3>
+<h3 className="text-base md:text-lg font-bold mb-3 md:mb-4 flex items-center gap-2 text-emerald-400"><UserCog size={18} className="md:w-5 md:h-5"/> Admin Konten</h3>
 
-<div className="flex gap-2 mb-4">
+<div className="flex flex-col sm:flex-row gap-2 mb-4">
 
-<input type="text" placeholder="Neuer Benutzername" className="bg-slate-700 border-none rounded p-2 text-sm text-white" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)}/>
+<input type="text" placeholder="Neuer Benutzername" className="flex-1 bg-slate-700 border-none rounded p-2 md:p-2.5 text-sm md:text-base text-white placeholder-slate-400" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)}/>
 
-<input type="text" placeholder="Passwort" className="bg-slate-700 border-none rounded p-2 text-sm text-white" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}/>
+<input type="text" placeholder="Passwort" className="flex-1 bg-slate-700 border-none rounded p-2 md:p-2.5 text-sm md:text-base text-white placeholder-slate-400" value={newAdminPass} onChange={e => setNewAdminPass(e.target.value)}/>
 
-<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded text-sm font-bold">Hinzufügen</button>
+<button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 md:px-4 py-2 md:py-2.5 rounded text-sm md:text-base font-bold whitespace-nowrap">Hinzufügen</button>
 
 </div>
 
@@ -6929,16 +6929,16 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 
 {/* EINSTELLUNGEN */}
 
-<div className={`p-6 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+<div className={`p-4 md:p-6 rounded-xl border transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
 
-<h3 className={`font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Settings className="text-blue-500"/> Einstellungen</h3>
+<h3 className={`text-base md:text-lg font-bold mb-3 md:mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Settings size={18} className="md:w-5 md:h-5 text-blue-500"/> Einstellungen</h3>
 
 <div className="space-y-4">
 
-<div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-  <div>
-    <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Turniertage im Spielplan anzeigen</div>
-    <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Zeigt die Liste der Turniere und Spieltage im Spielplan-Tab an</div>
+<div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 md:p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+  <div className="flex-1">
+    <div className={`text-sm md:text-base font-medium ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Turniertage im Spielplan anzeigen</div>
+    <div className={`text-[10px] md:text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Zeigt die Liste der Turniere und Spieltage im Spielplan-Tab an</div>
   </div>
   <label className="relative inline-flex items-center cursor-pointer">
     <input
@@ -6951,10 +6951,10 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
   </label>
 </div>
 
-<div className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
-  <div>
-    <div className={`font-medium ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Turnierbaum-Menü aktivieren</div>
-    <div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aktiviert das Turnier-Tab mit K.O.-System und Gruppenauslosung</div>
+<div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 md:p-4 rounded-lg border transition-colors ${darkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}>
+  <div className="flex-1">
+    <div className={`text-sm md:text-base font-medium ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Turnierbaum-Menü aktivieren</div>
+    <div className={`text-[10px] md:text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>Aktiviert das Turnier-Tab mit K.O.-System und Gruppenauslosung</div>
   </div>
   <label className="relative inline-flex items-center cursor-pointer">
     <input
@@ -6977,9 +6977,9 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 
 {pendingRegistrations.length > 0 && (
 
-<div className={`border rounded-xl p-6 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-orange-50 border-orange-100'}`}>
+<div className={`border rounded-xl p-4 md:p-6 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-orange-50 border-orange-100'}`}>
 
-<h3 className={`text-lg font-bold mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-orange-800'}`}><UserCheck className={darkMode ? 'text-slate-400' : 'text-orange-600'}/> Offene Anmeldungen</h3>
+<h3 className={`text-base md:text-lg font-bold mb-3 md:mb-4 flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-orange-800'}`}><UserCheck size={18} className={`md:w-5 md:h-5 ${darkMode ? 'text-slate-400' : 'text-orange-600'}`}/> Offene Anmeldungen</h3>
 
 <div className="space-y-3">
 
@@ -6990,13 +6990,13 @@ const ageLabel = formatAgeGroupLabel(calculateAgeGroup(req.birthDate));
 
 return (
 
-<div key={req.id} className={`p-4 rounded-lg shadow-sm border flex justify-between items-center transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-orange-100'}`}>
+<div key={req.id} className={`p-3 md:p-4 rounded-lg shadow-sm border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-orange-100'}`}>
 
-<div>
+<div className="flex-1 min-w-0">
 
-<div className={`font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{req.name} <span className={`font-normal ${darkMode ? 'text-slate-400' : 'text-slate-400'}`}>({ageLabel})</span></div>
+<div className={`text-sm md:text-base font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>{req.name} <span className={`font-normal ${darkMode ? 'text-slate-400' : 'text-slate-400'}`}>({ageLabel})</span></div>
 
-<div className={`text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+<div className={`text-[10px] md:text-xs mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'} break-words`}>
 
 Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}` : ''} {req.email ? ` - ${req.email}` : ''} {tourName ? ` - Will zu: ${tourName}` : ''}
 
@@ -7004,11 +7004,11 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 </div>
 
-<div className="flex gap-2">
+<div className="flex gap-2 flex-shrink-0 w-full sm:w-auto">
 
-<button onClick={() => rejectRegistration(req.id)} className={`p-2 rounded transition-colors ${darkMode ? 'text-red-300 hover:bg-slate-700' : 'text-red-400 hover:bg-red-50'}`}><XCircle size={20}/></button>
+<button onClick={() => rejectRegistration(req.id)} className={`flex-1 sm:flex-none p-2 rounded transition-colors ${darkMode ? 'text-red-300 hover:bg-slate-700' : 'text-red-400 hover:bg-red-50'}`}><XCircle size={18} className="md:w-5 md:h-5"/></button>
 
-<button onClick={() => approveRegistration(req)} className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded hover:bg-emerald-700 flex items-center gap-1"><CheckCircle2 size={14}/> Zulassen</button>
+<button onClick={() => approveRegistration(req)} className="flex-1 sm:flex-none px-3 md:px-4 py-2 bg-emerald-600 text-white text-xs md:text-sm font-bold rounded hover:bg-emerald-700 flex items-center justify-center gap-1 whitespace-nowrap"><CheckCircle2 size={14} className="md:w-4 md:h-4"/> Zulassen</button>
 
 </div>
 
@@ -7146,17 +7146,17 @@ Niveau {req.level || '?'} - Altersklasse {ageLabel} {req.club ? ` - ${req.club}`
 
 {/* TEST DATA GENERATOR */}
 
-<div className={`p-6 rounded-xl border mt-8 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+<div className={`p-4 md:p-6 rounded-xl border mt-6 md:mt-8 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
 
-<div className="flex justify-between items-center mb-4">
+<div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 md:mb-4">
 
-<h3 className={`font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Database className="text-blue-500"/> Massen-Testdaten</h3>
+<h3 className={`text-base md:text-lg font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Database size={18} className="md:w-5 md:h-5 text-blue-500"/> Massen-Testdaten</h3>
 
-{isGenerating && <span className={`text-xs animate-pulse flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><Loader2 size={12} className="animate-spin"/> {generationStatus}</span>}
+{isGenerating && <span className={`text-[10px] md:text-xs animate-pulse flex items-center gap-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}><Loader2 size={12} className="md:w-[14px] md:h-[14px] animate-spin"/> {generationStatus}</span>}
 
 </div>
 
-<p className={`text-sm mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+<p className={`text-xs md:text-sm mb-3 md:mb-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
 
 Generiert lokale Testdaten.
 
@@ -7164,11 +7164,11 @@ Generiert lokale Testdaten.
 
 
 
-<div className="grid md:grid-cols-3 gap-3 mb-4">
+<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-3 md:mb-4">
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 uppercase block mb-1">
+<label className={`text-[10px] md:text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
 
 Anzahl Test-Spieler
 
@@ -7182,7 +7182,7 @@ min={2}
 
 max={10000}
 
-className={`w-full p-3 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-blue-300'}`}
+className={`w-full p-2 md:p-3 border rounded-lg text-sm md:text-base transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-blue-300'}`}
 
 value={testPlayerCount}
 
@@ -7194,7 +7194,7 @@ onChange={(e) => setTestPlayerCount(parseInt(e.target.value) || 0)}
 
 <div>
 
-<label className="text-xs font-bold text-slate-600 uppercase block mb-1">
+<label className={`text-[10px] md:text-xs font-bold uppercase block mb-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
 
 Matches pro Spieler
 
@@ -7206,7 +7206,7 @@ type="number"
 
 min={1}
 
-className={`w-full p-3 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-blue-300'}`}
+className={`w-full p-2 md:p-3 border rounded-lg text-sm md:text-base transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-blue-300'}`}
 
 value={testMatchesPerPlayer}
 
@@ -7219,17 +7219,17 @@ onChange={(e) => setTestMatchesPerPlayer(parseInt(e.target.value) || 0)}
 </div>
 
 
-<div className="flex gap-4">
+<div className="flex flex-col sm:flex-row gap-2 md:gap-3">
 
-<button onClick={generateTestData} disabled={isGenerating} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2">
+<button onClick={generateTestData} disabled={isGenerating} className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-sm md:text-base font-bold py-2 md:py-2.5 px-3 md:px-4 rounded-lg transition flex items-center justify-center gap-2">
 
-<PlusCircle size={16}/> Starten
+<PlusCircle size={16} className="md:w-[18px] md:h-[18px]"/> Starten
 
 </button>
 
-<button onClick={deleteTestData} disabled={isGenerating} className={`border text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2 ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500' : 'bg-white border-red-200 text-red-500 hover:bg-red-50 disabled:bg-slate-50 disabled:text-slate-300'}`}>
+<button onClick={deleteTestData} disabled={isGenerating} className={`flex-1 sm:flex-none border text-sm md:text-base font-bold py-2 md:py-2.5 px-3 md:px-4 rounded-lg transition flex items-center justify-center gap-2 ${darkMode ? 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500' : 'bg-white border-red-200 text-red-500 hover:bg-red-50 disabled:bg-slate-50 disabled:text-slate-300'}`}>
 
-<Trash2 size={16}/> Alles löschen
+<Trash2 size={16} className="md:w-[18px] md:h-[18px]"/> Alles löschen
 
 </button>
 
