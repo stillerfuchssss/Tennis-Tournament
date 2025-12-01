@@ -3434,17 +3434,17 @@ const h2hPlayers = players
 
 return (
 
-<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+<div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-2 md:p-4">
 
-<div className={`rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 transition-colors ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
+<div className={`rounded-2xl w-full max-w-2xl max-h-[90vh] md:max-h-[80vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 transition-colors ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
 
-<div className="bg-slate-800 text-white p-6 sticky top-0 z-10">
+<div className="bg-slate-800 text-white p-4 md:p-6 sticky top-0 z-10">
 
 <div className="flex justify-between items-start">
 
 <div>
 
-<h2 className="text-2xl font-bold flex items-center gap-2">
+<h2 className="text-xl md:text-2xl font-bold flex items-center gap-2">
 
 {viewingPlayer.isTeam && <Users2 size={24}/>}
 
@@ -3829,25 +3829,25 @@ if (!confirmDialog || !confirmDialog.isOpen) return null;
 
 return (
 
-<div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-in fade-in">
+<div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-2 md:p-4 animate-in fade-in">
 
-<div className={`rounded-xl shadow-2xl p-6 max-w-sm w-full animate-in zoom-in-95 transition-colors ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
+<div className={`rounded-xl shadow-2xl p-4 md:p-6 max-w-sm w-full animate-in zoom-in-95 transition-colors ${darkMode ? 'bg-slate-900' : 'bg-white'}`}>
 
-<div className="flex items-center gap-3 mb-4 text-red-600">
+<div className="flex items-center gap-2 md:gap-3 mb-3 md:mb-4 text-red-600">
 
-<AlertCircle size={24}/>
+<AlertCircle size={20} className="md:w-6 md:h-6"/>
 
-<h3 className="text-lg font-bold">Bestätigung</h3>
+<h3 className="text-base md:text-lg font-bold">Bestätigung</h3>
 
 </div>
 
-<p className={`mb-6 ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{confirmDialog.message}</p>
+<p className={`mb-4 md:mb-6 text-sm md:text-base ${darkMode ? 'text-slate-300' : 'text-slate-600'}`}>{confirmDialog.message}</p>
 
-<div className="flex justify-end gap-3">
+<div className="flex justify-end gap-2 md:gap-3 flex-wrap">
 
-<button onClick={closeConfirm} className={`px-4 py-2 font-medium rounded-lg transition ${darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'}`}>Abbrechen</button>
+<button onClick={closeConfirm} className={`px-3 md:px-4 py-2 font-medium text-sm md:text-base rounded-lg transition ${darkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'}`}>Abbrechen</button>
 
-<button onClick={confirmDialog.onConfirm} className="px-4 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausführen</button>
+<button onClick={confirmDialog.onConfirm} className="px-3 md:px-4 py-2 bg-red-600 text-white text-sm md:text-base font-bold rounded-lg hover:bg-red-700 shadow-lg shadow-red-200">Ja, ausführen</button>
 
 </div>
 
@@ -3948,17 +3948,17 @@ Tennis Turnier Manager
 
 {!isAdmin ? (
 
-<div className="flex gap-2 w-full md:w-auto">
+<div className="flex gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
 
-<input type="text" placeholder="Admin User" className="bg-transparent border-b border-slate-500 focus:border-white focus:outline-none text-white text-sm placeholder-slate-500 w-24 px-1"
+<input type="text" placeholder="Admin User" className="bg-transparent border-b border-slate-500 focus:border-white focus:outline-none text-white text-xs md:text-sm placeholder-slate-500 w-20 md:w-24 px-1"
 
 value={adminUsernameInput} onChange={(e) => setAdminUsernameInput(e.target.value)} />
 
-<input type="password" placeholder="Passwort" className="bg-transparent border-b border-slate-500 focus:border-white focus:outline-none text-white text-sm placeholder-slate-500 w-24 px-1"
+<input type="password" placeholder="Passwort" className="bg-transparent border-b border-slate-500 focus:border-white focus:outline-none text-white text-xs md:text-sm placeholder-slate-500 w-20 md:w-24 px-1"
 
 value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value)} />
 
-<button onClick={toggleAdmin} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded transition ml-2">Login</button>
+<button onClick={toggleAdmin} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 md:px-3 py-1.5 rounded transition md:ml-2">Login</button>
 
 </div>
 
@@ -3980,35 +3980,36 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 <div className={`flex border-b overflow-x-auto sticky top-0 z-10 scrollbar-hide transition-colors duration-300 ${darkMode ? 'border-slate-700 bg-slate-900' : 'border-slate-200 bg-white'}`}>
 
-<button onClick={() => setActiveTab('ranking')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'ranking' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+<button onClick={() => setActiveTab('ranking')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[80px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'ranking' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
-<Medal size={18} /> Rangliste
+<Medal size={16} className="md:w-[18px] md:h-[18px]" /> <span className="hidden sm:inline">Rangliste</span><span className="sm:hidden">Rang</span>
 
 </button>
 
 {enableTournamentMenu && (
-<button onClick={() => setActiveTab('bracket')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'bracket' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+<button onClick={() => setActiveTab('bracket')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[100px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'bracket' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
-Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
+<span className="hidden lg:inline">Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})</span>
+<span className="lg:hidden">Turnier</span>
 
 </button>
 )}
 
-<button onClick={() => setActiveTab('planner')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'planner' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+<button onClick={() => setActiveTab('planner')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[80px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'planner' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
-<Calendar className="text-emerald-600" size={18}/> Spielplan
-
-</button>
-
-<button onClick={() => setActiveTab('players')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'players' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
-
-<Users size={18} /> Spieler
+<Calendar className="text-emerald-600" size={16} /> <span className="hidden sm:inline">Spielplan</span><span className="sm:hidden">Plan</span>
 
 </button>
 
-<button onClick={() => setActiveTab('register')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+<button onClick={() => setActiveTab('players')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[80px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'players' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
-<ClipboardList size={18} /> {isAdmin ? 'Spieler Hinzufügen' : 'Anmeldung'}
+<Users size={16} /> <span className="hidden sm:inline">Spieler</span><span className="sm:hidden">Spieler</span>
+
+</button>
+
+<button onClick={() => setActiveTab('register')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[100px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+
+<ClipboardList size={16} /> <span className="hidden lg:inline">{isAdmin ? 'Spieler Hinzufügen' : 'Anmeldung'}</span><span className="lg:hidden">{isAdmin ? 'Hinzu.' : 'Anm.'}</span>
 
 </button>
 
@@ -4016,15 +4017,15 @@ Turnier ({displayAgeGroup(activeBracketAge)} / Level {activeBracketLevel})
 
 <>
 
-<button onClick={() => setActiveTab('input')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'input' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+<button onClick={() => setActiveTab('input')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[80px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'input' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
-<Activity size={18} /> Eingabe
+<Activity size={16} /> <span className="hidden sm:inline">Eingabe</span><span className="sm:hidden">Eingabe</span>
 
 </button>
 
-<button onClick={() => setActiveTab('admin')} className={`flex-1 py-4 px-4 min-w-[120px] font-medium flex justify-center gap-2 border-b-2 transition ${activeTab === 'admin' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
+<button onClick={() => setActiveTab('admin')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[80px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'admin' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
-<Settings size={18} /> Verwaltung {pendingRegistrations.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center">{pendingRegistrations.length}</span>}
+<Settings size={16} /> <span className="hidden sm:inline">Verwaltung</span><span className="sm:hidden">Admin</span> {pendingRegistrations.length > 0 && <span className="ml-1 bg-red-500 text-white text-[10px] w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center">{pendingRegistrations.length}</span>}
 
 </button>
 
@@ -4172,21 +4173,21 @@ className={`px-4 py-1.5 text-xs transition-colors ${darkMode ? 'text-slate-100 b
 
 <table className="w-full text-left">
 
-<thead className={`text-xs uppercase font-bold tracking-wider transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-500'}`}>
+<thead className={`text-[10px] md:text-xs uppercase font-bold tracking-wider transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-500'}`}>
 
 <tr>
 
-<th className="p-4 w-16 text-center">Rang</th>
+<th className="p-2 md:p-4 w-12 md:w-16 text-center">Rang</th>
 
-<th className="p-4">Spieler</th>
+<th className="p-2 md:p-4">Spieler</th>
 
-<th className="p-4">Altersklasse</th>
+<th className="p-2 md:p-4 hidden sm:table-cell">Altersklasse</th>
 
-<th className="p-4 text-right">Punkte</th>
+<th className="p-2 md:p-4 text-right">Punkte</th>
 
-<th className="p-4 w-10"></th>
+<th className="p-2 md:p-4 w-8 md:w-10"></th>
 
-{isAdmin && <th className="p-4 w-16">Aktion</th>}
+{isAdmin && <th className="p-2 md:p-4 w-12 md:w-16">Aktion</th>}
 
 </tr>
 
@@ -4208,9 +4209,9 @@ return (
 
 <tr key={player.id} onClick={() => setViewingPlayer(player)} className={`cursor-pointer transition group ${darkMode ? 'hover:bg-slate-800/50' : 'hover:bg-emerald-50/50'}`}>
 
-<td className="p-4 text-center">
+<td className="p-2 md:p-4 text-center">
 
-<span className={`inline-block w-10 h-10 leading-10 rounded-full font-bold text-sm shadow-md ${
+<span className={`inline-block w-8 h-8 leading-8 md:w-10 md:h-10 md:leading-10 rounded-full font-bold text-xs md:text-sm shadow-md ${
   realRank === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900' :
   realRank === 2 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900' :
   realRank === 3 ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-900' :
@@ -4219,36 +4220,36 @@ return (
 
 </td>
 
-<td className="p-4">
+<td className="p-2 md:p-4">
 
-<div className={`font-bold text-lg flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+<div className={`font-bold text-sm md:text-lg flex items-center gap-1 md:gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
 
-{player.isTeam && <Users2 size={16} className="text-blue-500 dark:text-blue-400"/>}
+{player.isTeam && <Users2 size={14} className="md:w-4 md:h-4 text-blue-500 dark:text-blue-400"/>}
 
-{player.name}
+<span className="truncate max-w-[120px] sm:max-w-none">{player.name}</span>
 
 </div>
 
-<div className="mt-1">
+<div className="mt-0.5 md:mt-1">
 {renderLevelBadge(player.level, 'sm')}
 </div>
 
 </td>
 
-<td className="p-4 text-sm">
+<td className="p-2 md:p-4 text-xs md:text-sm hidden sm:table-cell">
 
-<span className={`px-3 py-1.5 rounded-lg font-semibold shadow-sm ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-emerald-100 text-emerald-800'}`}>{player.ageGroup}</span>
+<span className={`px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-semibold shadow-sm text-xs ${darkMode ? 'bg-slate-700 text-slate-200' : 'bg-emerald-100 text-emerald-800'}`}>{player.ageGroup}</span>
 
 </td>
 
-<td className="p-4 text-right">
+<td className="p-2 md:p-4 text-right">
 
-<div className="flex flex-col items-end gap-1">
-<span className={`text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{player.totalPoints}</span>
+<div className="flex flex-col items-end gap-0.5 md:gap-1">
+<span className={`text-xl md:text-3xl font-black ${darkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{player.totalPoints}</span>
 
-<div className={`text-[10px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
+<div className={`text-[9px] md:text-[10px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
 
-{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teilnahme • ` : ''}
+{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teiln. • ` : ''}
 
 {player.details[0]?.stats}
 
@@ -4257,7 +4258,7 @@ return (
 
 </td>
 
-<td className={`p-4 transition-colors ${darkMode ? 'text-slate-600 group-hover:text-emerald-400' : 'text-slate-300 group-hover:text-emerald-500'}`}><ChevronRight size={20}/></td>
+<td className={`p-2 md:p-4 transition-colors ${darkMode ? 'text-slate-600 group-hover:text-emerald-400' : 'text-slate-300 group-hover:text-emerald-500'}`}><ChevronRight size={16} className="md:w-5 md:h-5"/></td>
 
 </tr>
 
@@ -4790,11 +4791,11 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {activeTab === 'planner' && (
 <div className="animate-in fade-in space-y-6">
 
-<div className={`rounded-xl shadow-sm border p-6 flex flex-col gap-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-<div className="flex flex-col gap-4">
+<div className={`rounded-xl shadow-sm border p-4 md:p-6 flex flex-col gap-3 md:gap-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+<div className="flex flex-col gap-3 md:gap-4">
 <div>
-<h2 className={`text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-emerald-600" size={18}/> Spielplan nach Turniertag & Alters-/Leistungsklasse</h2>
-<p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Wähle einen Turniertag und lose pro Level aus. Der Spielmodus kann für jede Gruppe einzeln festgelegt werden.</p>
+<h2 className={`text-lg md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}><Calendar className="text-emerald-600" size={16} className="md:w-[18px] md:h-[18px]"/> Spielplan nach Turniertag & Alters-/Leistungsklasse</h2>
+<p className={`text-xs md:text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>Wähle einen Turniertag und lose pro Level aus. Der Spielmodus kann für jede Gruppe einzeln festgelegt werden.</p>
 </div>
 <div className="flex flex-col gap-3 w-full">
 <div className="grid md:grid-cols-2 gap-3">
@@ -4833,15 +4834,15 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   return (
 <>
 {selectedTournament && selectedRound && (
-  <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-5 rounded-xl border border-emerald-800 shadow-lg">
-    <div className="flex items-center gap-3 text-white">
-      <CalendarDays size={24} className="text-emerald-100"/>
-      <div>
-        <div className="text-xs font-semibold text-emerald-200 uppercase tracking-wide">Aktuelle Auswahl</div>
-        <div className="text-xl font-bold">{selectedTournament.name}</div>
-        <div className="text-sm text-emerald-100 flex items-center gap-2 mt-1">
-          <Calendar size={14}/>
-          {selectedRound.name} - {selectedRound.date}
+  <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 p-3 md:p-5 rounded-xl border border-emerald-800 shadow-lg">
+    <div className="flex items-center gap-2 md:gap-3 text-white">
+      <CalendarDays size={20} className="md:w-6 md:h-6 text-emerald-100 flex-shrink-0"/>
+      <div className="min-w-0">
+        <div className="text-[10px] md:text-xs font-semibold text-emerald-200 uppercase tracking-wide">Aktuelle Auswahl</div>
+        <div className="text-base md:text-xl font-bold truncate">{selectedTournament.name}</div>
+        <div className="text-xs md:text-sm text-emerald-100 flex items-center gap-1 md:gap-2 mt-0.5 md:mt-1">
+          <Calendar size={12} className="md:w-[14px] md:h-[14px] flex-shrink-0"/>
+          <span className="truncate">{selectedRound.name} - {selectedRound.date}</span>
         </div>
       </div>
     </div>
@@ -4857,8 +4858,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 </div>
 {isAdmin && (
   <>
-    <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
-      <Shuffle size={18}/> Alle Leistungsklassen auslosen
+    <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
+      <Shuffle size={16} className="md:w-[18px] md:h-[18px]"/> Alle Leistungsklassen auslosen
     </button>
     <button
       onClick={() => {
@@ -4914,9 +4915,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           }
         });
       }}
-      className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+      className="w-full px-3 md:px-4 py-2 md:py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
     >
-      <Trash2 size={16}/> Alle Gruppen löschen
+      <Trash2 size={14} className="md:w-4 md:h-4"/> Alle Gruppen löschen
     </button>
   </>
 )}
@@ -5152,9 +5153,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 setPlannerFixtures(prev => ({ ...prev, [key]: newFixtures }));
                 addToast(`${LEVEL_LABELS[level]} ausgelost`, 'success');
               }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded"
+              className="px-2 md:px-3 py-1 md:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] md:text-xs font-bold rounded"
             >
-              <Shuffle size={12} className="inline mr-1"/> Auslosen
+              <Shuffle size={10} className="md:w-3 md:h-3 inline mr-1"/> Auslosen
             </button>
             <button
               onClick={() => {
@@ -5196,10 +5197,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                   }
                 });
               }}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded flex items-center justify-center gap-1"
+              className="px-2 md:px-3 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] md:text-xs font-bold rounded flex items-center justify-center gap-1"
               title="Gesamte Gruppe löschen"
             >
-              <Trash2 size={12}/> Gruppe löschen
+              <Trash2 size={10} className="md:w-3 md:h-3"/> Gruppe löschen
             </button>
           </div>
         )}
@@ -5208,17 +5209,17 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 overflow-x-auto space-y-3">
           <table className="w-full text-left">
-            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-xs font-bold tracking-wide">
+            <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-[10px] md:text-xs font-bold tracking-wide">
               <tr>
-                <th className="px-4 py-3 text-center w-16">Platz</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Verein</th>
-                <th className="px-4 py-3 text-center">Teiln.</th>
-                <th className="px-4 py-3 text-center">S</th>
-                <th className="px-4 py-3 text-center">KN</th>
-                <th className="px-4 py-3 text-center">N</th>
-                <th className="px-4 py-3 text-right">Punkte</th>
-                {isAdmin && <th className="px-4 py-3 text-center w-16">Aktion</th>}
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16">Platz</th>
+                <th className="px-2 md:px-4 py-2 md:py-3">Name</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 hidden lg:table-cell">Verein</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center">Teiln.</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center">S</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center hidden sm:table-cell">KN</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-center">N</th>
+                <th className="px-2 md:px-4 py-2 md:py-3 text-right">Punkte</th>
+                {isAdmin && <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16">Aktion</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -5226,25 +5227,25 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 <tr><td colSpan={isAdmin ? 9 : 8} className="px-4 py-6 text-center text-slate-400 dark:text-slate-500">Noch keine Spieler in dieser Leistungsklasse</td></tr>
               ) : stats.map((s, idx) => (
                 <tr key={s.player.id} className={`cursor-pointer transition ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`} onClick={() => setViewingPlayer(s.player)}>
-                  <td className="px-4 py-3.5 text-center">
-                    <span className={`inline-block w-8 h-8 leading-8 rounded-full font-bold text-sm shadow-sm ${
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center">
+                    <span className={`inline-block w-7 h-7 leading-7 md:w-8 md:h-8 md:leading-8 rounded-full font-bold text-xs md:text-sm shadow-sm ${
                       idx === 0 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 text-yellow-900' :
                       idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-slate-900' :
                       idx === 2 ? 'bg-gradient-to-br from-orange-400 to-orange-600 text-orange-900' :
                       darkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'
                     }`}>{idx + 1}</span>
                   </td>
-                  <td className="px-4 py-3.5 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline">{s.player.name}</td>
-                  <td className="px-4 py-3.5 text-slate-500 dark:text-slate-400 text-sm">{s.player.club || '-'}</td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">{s.participationPoints}</td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-green-600 dark:text-green-400">{s.wins}</td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-orange-600 dark:text-orange-400">{s.close}</td>
-                  <td className="px-4 py-3.5 text-center font-semibold text-red-600 dark:text-red-400">{s.losses}</td>
-                  <td className="px-4 py-3.5 text-right">
-                    <span className="text-xl font-black bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 bg-clip-text text-transparent">
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 font-semibold text-xs md:text-base text-emerald-600 dark:text-emerald-400 hover:underline truncate max-w-[100px] sm:max-w-none">{s.player.name}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-slate-500 dark:text-slate-400 text-xs md:text-sm hidden lg:table-cell">{s.player.club || '-'}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-slate-700 dark:text-slate-300">{s.participationPoints}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-green-600 dark:text-green-400">{s.wins}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-orange-600 dark:text-orange-400 hidden sm:table-cell">{s.close}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-red-600 dark:text-red-400">{s.losses}</td>
+                  <td className="px-2 md:px-4 py-2 md:py-3.5 text-right">
+                    <span className="text-base md:text-xl font-black bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 bg-clip-text text-transparent">
                       {s.points.toFixed(1)}
                     </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">Pkt</span>
+                    <span className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 ml-1">Pkt</span>
                   </td>
                   {isAdmin && (
                     <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
