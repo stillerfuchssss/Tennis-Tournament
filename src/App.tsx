@@ -371,12 +371,9 @@ SETTINGS: 'tm_settings'
 
 };
 
-// --- CSV IMPORT/EXPORT HELPERS ---
-const exportPlayersToCSV = (players: Player[]) => {
-  // CSV Header - gleiches Format wie Excel-Meldeliste
-  const headers = ['Name', 'Vorname', 'Verein', 'Geburtsdatum', 'Altersklasse', 'Niveau', 'Emailadresse'];
-
-  // Mapping AgeGroup zu Excel-Namen (umgekehrt zum Import)
+// --- EXCEL IMPORT/EXPORT HELPERS ---
+const exportPlayersToExcel = (players: Player[]) => {
+  // Mapping AgeGroup zu Excel-Namen
   const ageGroupToExcel: Record<AgeGroup, string> = {
     Green: 'Bambini',
     Red: 'Kleinfeld', 
@@ -384,26 +381,23 @@ const exportPlayersToCSV = (players: Player[]) => {
     Yellow: 'Großfeld'
   };
 
-  // Mapping Level zu Niveau-Namen (exakt wie in der Excel-Meldeliste)
+  // Mapping Level zu Niveau-Namen
   const levelToNiveau: Record<Level, string> = {
     A: 'A-Turniererfahrene',
     B: 'B-Mittelstufe',
     C: 'C-Einsteiger'
   };
 
-  // CSV Rows
+  // Spielerdaten vorbereiten
   const rows = players.map(p => {
-    // Name aufteilen in Nachname und Vorname
-    // Format "Vorname Nachname" → Name=Nachname, Vorname=Vorname
     const nameParts = p.name.trim().split(' ');
     let nachname = p.name;
     let vorname = '';
     if (nameParts.length >= 2) {
-      nachname = nameParts[nameParts.length - 1]; // Letztes Wort = Nachname
-      vorname = nameParts.slice(0, -1).join(' '); // Rest = Vorname
+      nachname = nameParts[nameParts.length - 1];
+      vorname = nameParts.slice(0, -1).join(' ');
     }
     
-    // Geburtsdatum: nur das Jahr extrahieren
     let birthYear = '';
     if (p.birthDate) {
       if (p.birthDate.includes('-')) {
@@ -416,29 +410,98 @@ const exportPlayersToCSV = (players: Player[]) => {
       }
     }
     
-    return [
+    return {
       nachname,
       vorname,
-      p.club || '',
-      birthYear,
-      p.ageGroup ? ageGroupToExcel[p.ageGroup] : '',
-      p.level ? levelToNiveau[p.level] : '',
-      p.email || ''
-    ];
+      verein: p.club || '',
+      geburtsdatum: birthYear,
+      altersklasse: p.ageGroup ? ageGroupToExcel[p.ageGroup] : '',
+      niveau: p.level ? levelToNiveau[p.level] : '',
+      email: p.email || ''
+    };
   });
 
-  // Kombiniere Headers und Rows mit Semikolon (Excel-Standard DE)
-  const csvContent = [
-    headers.join(';'),
-    ...rows.map(row => row.join(';'))
-  ].join('\n');
+  // HTML-Tabelle mit Excel-Styling (exakt wie deine Meldeliste)
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+    <head>
+      <meta charset="UTF-8">
+      <!--[if gte mso 9]>
+      <xml>
+        <x:ExcelWorkbook>
+          <x:ExcelWorksheets>
+            <x:ExcelWorksheet>
+              <x:Name>Meldeliste</x:Name>
+            </x:ExcelWorksheet>
+          </x:ExcelWorksheets>
+        </x:ExcelWorkbook>
+      </xml>
+      <![endif]-->
+      <style>
+        table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+        .title { 
+          font-size: 26pt; 
+          font-weight: bold; 
+          text-align: center; 
+          color: #000000;
+        }
+        .header { 
+          background-color: #4DD0E1; 
+          color: #000000; 
+          font-weight: bold; 
+          border: 1px solid #26C6DA;
+          padding: 8px 12px;
+          text-align: left;
+        }
+        .data { 
+          background-color: #E0F7FA; 
+          border: 1px solid #B2EBF2;
+          padding: 6px 10px;
+        }
+        .data-alt { 
+          background-color: #B2EBF2; 
+          border: 1px solid #80DEEA;
+          padding: 6px 10px;
+        }
+        .email { color: #0066CC; text-decoration: underline; }
+      </style>
+    </head>
+    <body>
+      <table>
+        <tr><td colspan="7" height="30"></td></tr>
+        <tr><td colspan="7" class="title" height="40">Meldeliste</td></tr>
+        <tr><td colspan="7" height="10"></td></tr>
+        <tr>
+          <td class="header" width="120">Name</td>
+          <td class="header" width="120">Vorname</td>
+          <td class="header" width="180">Verein</td>
+          <td class="header" width="110">Geburtsdatum</td>
+          <td class="header" width="110">Altersklasse</td>
+          <td class="header" width="140">Niveau</td>
+          <td class="header" width="250">Emailadresse</td>
+        </tr>
+        ${rows.map((r, i) => `
+        <tr>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'}">${r.nachname}</td>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'}">${r.vorname}</td>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'}">${r.verein}</td>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'}">${r.geburtsdatum}</td>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'}">${r.altersklasse}</td>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'}">${r.niveau}</td>
+          <td class="${i % 2 === 0 ? 'data' : 'data-alt'} email">${r.email}</td>
+        </tr>
+        `).join('')}
+      </table>
+    </body>
+    </html>
+  `;
 
-  // Download-Trigger
-  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM für Excel
+  // Download als .xls (Excel öffnet HTML-Tabellen korrekt)
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', `meldeliste_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `meldeliste_export_${new Date().toISOString().split('T')[0]}.xls`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -6421,11 +6484,11 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {isAdmin && (
   <>
     <button
-      onClick={() => exportPlayersToCSV(players)}
+      onClick={() => exportPlayersToExcel(players)}
       className="bg-emerald-600 text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2 hover:bg-emerald-700"
-      title="Spielerliste als CSV exportieren"
+      title="Spielerliste als Excel exportieren"
     >
-      <Database size={14} className="md:w-4 md:h-4"/> <span className="hidden sm:inline">Export CSV</span><span className="sm:hidden">Export</span>
+      <Database size={14} className="md:w-4 md:h-4"/> <span className="hidden sm:inline">Export Excel</span><span className="sm:hidden">Export</span>
     </button>
 
     <button
