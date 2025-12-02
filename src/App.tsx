@@ -5521,19 +5521,19 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 </div>
 
 {isAdmin && (
-  <div className={`border rounded-xl p-6 space-y-5 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-200'}`}>
-    <div className="flex items-center gap-2 mb-4">
-      <UserPlus size={20} className={darkMode ? 'text-slate-400' : 'text-blue-600'}/>
-      <h3 className={`text-base font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Spieler hinzufügen</h3>
+  <div className={`border rounded-xl p-4 md:p-6 space-y-4 md:space-y-5 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-blue-50 border-blue-200'}`}>
+    <div className="flex items-center gap-2 mb-3 md:mb-4">
+      <UserPlus size={18} className={`md:w-5 md:h-5 ${darkMode ? 'text-slate-400' : 'text-blue-600'}`}/>
+      <h3 className={`text-sm md:text-base font-bold ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>Spieler hinzufügen</h3>
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6">
       <div className="lg:col-span-2">
-        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Spieler wählen</label>
-        <div className="flex gap-2 mb-2">
+        <label className="block text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-2 md:mb-3 tracking-wide">Spieler wählen</label>
+        <div className="flex flex-wrap gap-2 mb-2">
           <select
             value={plannerFilterAgeGroup}
             onChange={e => setPlannerFilterAgeGroup(e.target.value as AgeGroup | 'All')}
-            className={`p-2 border rounded-lg text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
+            className={`flex-1 min-w-[120px] p-2 md:p-2.5 border rounded-lg text-xs md:text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
           >
             <option value="All">Alle Alter</option>
             {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
@@ -5543,7 +5543,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           <select
             value={plannerFilterLevel}
             onChange={e => setPlannerFilterLevel(e.target.value as Level | 'All')}
-            className={`p-2 border rounded-lg text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
+            className={`flex-1 min-w-[120px] p-2 md:p-2.5 border rounded-lg text-xs md:text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
           >
             <option value="All">Alle Leistungsklassen</option>
             <option value="A">{LEVEL_LABELS.A}</option>
@@ -5556,12 +5556,12 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           value={plannerPlayerSearch}
           onChange={e => setPlannerPlayerSearch(e.target.value)}
           placeholder="Suche..."
-          className={`w-full mb-2 p-2 text-sm border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
+          className={`w-full mb-2 p-2 md:p-2.5 text-sm md:text-base border rounded-lg transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
         />
         <select
           value={plannerSelectedPlayerId}
           onChange={e => setPlannerSelectedPlayerId(e.target.value)}
-          className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
+          className={`w-full p-2.5 md:p-3.5 border rounded-lg text-sm md:text-base transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}
         >
           <option value="">-- Wählen --</option>
           {players
@@ -5580,23 +5580,23 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Ziel-Altersklasse</label>
-        <select value={plannerTargetAgeGroup} onChange={e => setPlannerTargetAgeGroup(e.target.value as AgeGroup)} className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
+        <label className="block text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-2 md:mb-3 tracking-wide">Ziel-Altersklasse</label>
+        <select value={plannerTargetAgeGroup} onChange={e => setPlannerTargetAgeGroup(e.target.value as AgeGroup)} className={`w-full p-2.5 md:p-3.5 border rounded-lg text-sm md:text-base transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
           {getSortedAgeGroups().filter(g => g !== 'All').map(g => (
             <option key={g} value={g}>{displayAgeGroup(g)}</option>
           ))}
         </select>
       </div>
       <div>
-        <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-3 tracking-wide">Leistungsklasse</label>
-        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className={`w-full p-3.5 border rounded-lg text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
+        <label className="block text-[10px] md:text-xs font-bold text-slate-600 dark:text-slate-300 uppercase mb-2 md:mb-3 tracking-wide">Leistungsklasse</label>
+        <select value={plannerNewLevel} onChange={e => setPlannerNewLevel(e.target.value as Level)} className={`w-full p-2.5 md:p-3.5 border rounded-lg text-sm md:text-base transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:border-slate-500 focus:ring-blue-500' : 'bg-white text-slate-900 border-slate-300 hover:border-slate-400 focus:ring-blue-500'} focus:outline-none focus:ring-2`}>
           <option value="A">{LEVEL_LABELS.A}</option>
           <option value="B">{LEVEL_LABELS.B}</option>
           <option value="C">{LEVEL_LABELS.C}</option>
         </select>
       </div>
       <div>
-        <button onClick={quickAddPlannerPlayer} className="w-full px-4 py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 dark:bg-blue-500 dark:hover:bg-blue-600 dark:active:bg-blue-700 text-white text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg dark:shadow-blue-900/30 transition-all"><UserPlus size={16}/> Hinzufügen</button>
+        <button onClick={quickAddPlannerPlayer} className="w-full px-3 md:px-4 py-2.5 md:py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 dark:bg-blue-500 dark:hover:bg-blue-600 dark:active:bg-blue-700 text-white text-sm md:text-base font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg dark:shadow-blue-900/30 transition-all"><UserPlus size={16} className="md:w-[18px] md:h-[18px]"/> Hinzufügen</button>
       </div>
     </div>
   </div>
@@ -5644,14 +5644,14 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
   const currentMode = groupMatchModes[groupKey] || 'auto';
 
   return (
-    <div key={level} className={`rounded-xl shadow-sm border p-6 space-y-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-      <div className="flex justify-between items-start gap-3">
-        <div className="flex-1">
-          <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+    <div key={level} className={`rounded-xl shadow-sm border p-4 md:p-6 space-y-3 md:space-y-4 transition-colors ${darkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base md:text-lg font-bold text-slate-800 dark:text-slate-100 flex flex-wrap items-center gap-2">
             {renderLevelBadge(level, 'md')}
-            <span className="text-slate-500 dark:text-slate-400 text-sm">Altersklasse: {displayAgeGroup(plannerAgeGroup)}</span>
+            <span className="text-slate-500 dark:text-slate-400 text-xs md:text-sm">Altersklasse: {displayAgeGroup(plannerAgeGroup)}</span>
           </h3>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+          <div className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-2">
             <span>Teilnehmer: {participantCount} • Gruppengewicht: x{weight.toFixed(2)}</span>
             {isAdmin && editingWeightGroup !== groupKey && (
               <button
@@ -5666,7 +5666,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               </button>
             )}
             {isAdmin && editingWeightGroup === groupKey && (
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1">
                 <input
                   type="number"
                   step="0.01"
@@ -5674,7 +5674,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                   max="10"
                   value={editingWeightValue}
                   onChange={e => setEditingWeightValue(e.target.value)}
-                  className="w-20 px-2 py-1 border border-blue-300 dark:border-blue-600 rounded text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-16 md:w-20 px-1 md:px-2 py-1 border border-blue-300 dark:border-blue-600 rounded text-[10px] md:text-xs bg-white dark:bg-slate-700 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
                 <button
@@ -5688,17 +5688,17 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                     setEditingWeightGroup(null);
                     addToast('Gewichtung gespeichert', 'success');
                   }}
-                  className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded"
+                  className="p-1 md:p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded"
                   title="Speichern"
                 >
-                  <Check size={14} />
+                  <Check size={12} className="md:w-3.5 md:h-3.5" />
                 </button>
                 <button
                   onClick={() => setEditingWeightGroup(null)}
-                  className="p-1 bg-slate-400 hover:bg-slate-500 text-white rounded"
+                  className="p-1 md:p-1.5 bg-slate-400 hover:bg-slate-500 text-white rounded"
                   title="Abbrechen"
                 >
-                  <X size={14} />
+                  <X size={12} className="md:w-3.5 md:h-3.5" />
                 </button>
                 {customGroupWeights[groupKey] !== undefined && (
                   <button
@@ -5709,10 +5709,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       setEditingWeightGroup(null);
                       addToast('Auf automatische Gewichtung zurückgesetzt', 'success');
                     }}
-                    className="p-1 bg-orange-500 hover:bg-orange-600 text-white rounded ml-1"
+                    className="p-1 md:p-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded ml-1"
                     title="Auf automatisch zurücksetzen"
                   >
-                    <ArrowRightCircle size={14} />
+                    <ArrowRightCircle size={12} className="md:w-3.5 md:h-3.5" />
                   </button>
                 )}
               </div>
@@ -5720,11 +5720,11 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
           </div>
         </div>
         {isAdmin && (
-          <div className="flex flex-col gap-2 min-w-[200px]">
+          <div className="flex flex-col gap-2 w-full lg:min-w-[200px] lg:w-auto">
             <select
               value={currentMode}
               onChange={e => setGroupMatchModes(prev => ({ ...prev, [groupKey]: e.target.value as 'auto' | 'single' | 'double' }))}
-              className={`p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}
+              className={`p-2 md:p-2.5 border rounded-lg text-xs md:text-sm transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}
             >
               <option value="auto">Automatisch</option>
               <option value="single">1x gegen jeden</option>
@@ -5747,9 +5747,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 setPlannerFixtures(prev => ({ ...prev, [key]: newFixtures }));
                 addToast(`${LEVEL_LABELS[level]} ausgelost`, 'success');
               }}
-              className="px-2 md:px-3 py-1 md:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] md:text-xs font-bold rounded"
+              className="w-full px-2 md:px-3 py-2 md:py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-1"
             >
-              <Shuffle size={10} className="md:w-3 md:h-3 inline mr-1"/> Auslosen
+              <Shuffle size={12} className="md:w-4 md:h-4"/> Auslosen
             </button>
             <button
               onClick={() => {
@@ -5791,10 +5791,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                   }
                 });
               }}
-              className="px-2 md:px-3 py-1 md:py-1.5 bg-red-600 hover:bg-red-700 text-white text-[10px] md:text-xs font-bold rounded flex items-center justify-center gap-1"
+              className="w-full px-2 md:px-3 py-2 md:py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-1"
               title="Gesamte Gruppe löschen"
             >
-              <Trash2 size={10} className="md:w-3 md:h-3"/> Gruppe löschen
+              <Trash2 size={12} className="md:w-4 md:h-4"/> Gruppe löschen
             </button>
 
             <button
@@ -5811,18 +5811,18 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                   selectedRound?.name + ' - ' + selectedRound?.date || 'Spieltag'
                 );
               }}
-              className="px-2 md:px-3 py-1 md:py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-xs font-bold rounded flex items-center justify-center gap-1"
+              className="w-full px-2 md:px-3 py-2 md:py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-1"
               title="Spielplan drucken"
             >
-              <ClipboardList size={10} className="md:w-3 md:h-3"/> Drucken
+              <ClipboardList size={12} className="md:w-4 md:h-4"/> Drucken
             </button>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6">
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 md:gap-6">
         <div className="lg:col-span-2 w-full overflow-x-auto space-y-3">
-          <table className="w-full text-left min-w-[600px] lg:min-w-full">
+          <table className="w-full text-left min-w-[400px] lg:min-w-full">
             <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-[10px] md:text-xs font-bold tracking-wide sticky top-0 z-5">
               <tr>
                 <th className="px-2 md:px-4 py-2 md:py-3 text-center w-12 md:w-16 flex-shrink-0">Platz</th>
@@ -5916,7 +5916,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         </div>
         <div className={`w-full border rounded-xl p-3 md:p-4 transition-colors ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div className="flex justify-between items-center mb-3 md:mb-4">
-            <span className="text-xs md:text-sm font-bold uppercase tracking-wide ${darkMode ? 'text-slate-200' : 'text-slate-700'}">Auslosung</span>
+            <span className={`text-xs md:text-sm font-bold uppercase tracking-wide ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Auslosung</span>
             <span className={`text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-400' : 'bg-white text-slate-500'}`}>{fixtures.length} geplant</span>
           </div>
           {fixtures.length === 0 ? (
@@ -5953,10 +5953,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       )}
                     </div>
                   </div>
-                  <div className={`font-bold mb-2 md:mb-3 text-sm md:text-base ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
-                    <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer truncate inline-block max-w-[120px] sm:max-w-none" onClick={() => setViewingPlayer(players.find(p => p.id === f.p1Id) || null)}>{resolveName(f.p1Id)}</span>
-                    {' '}<span className="text-slate-400 dark:text-slate-500 mx-1 md:mx-2">vs</span>{' '}
-                    <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer truncate inline-block max-w-[120px] sm:max-w-none" onClick={() => setViewingPlayer(players.find(p => p.id === f.p2Id) || null)}>{resolveName(f.p2Id)}</span>
+                  <div className={`font-bold mb-2 md:mb-3 text-xs md:text-sm leading-relaxed ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+                    <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p1Id) || null)}>{resolveName(f.p1Id)}</span>
+                    {' '}<span className="text-slate-400 dark:text-slate-500 mx-1">vs</span>{' '}
+                    <span className="text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer" onClick={() => setViewingPlayer(players.find(p => p.id === f.p2Id) || null)}>{resolveName(f.p2Id)}</span>
                   </div>
 
                   {/* Zeit-Planung */}
@@ -6039,12 +6039,12 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                         onChange={e => setPlannerScoreInput(prev => ({ ...prev, [f.id]: e.target.value }))}
                       />
                       {scoreStr && result && (
-                        <div className={`text-[10px] px-2 py-1 rounded transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-blue-50 text-slate-600'}`}>
-                          💡 {resolveName(f.p1Id)}: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p1Points.toFixed(1)}P</b> • {resolveName(f.p2Id)}: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p2Points.toFixed(1)}P</b>
+                        <div className={`text-[10px] px-2 py-1 rounded transition-colors overflow-hidden ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-blue-50 text-slate-600'}`}>
+                          💡 <span className="truncate inline-block max-w-[80px] align-bottom">{resolveName(f.p1Id)}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p1Points.toFixed(1)}P</b> • <span className="truncate inline-block max-w-[80px] align-bottom">{resolveName(f.p2Id)}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p2Points.toFixed(1)}P</b>
                         </div>
                       )}
-                      <div className="flex gap-2 items-center justify-between">
-                        <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className={`text-xs p-1.5 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
+                      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                        <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className={`flex-1 text-xs p-1.5 md:p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
                           <option value="race4">Zählweise: bis 4</option>
                           <option value="race10">Zählweise: bis 10</option>
                           <option value="race15">Zählweise: bis 15</option>
@@ -6053,7 +6053,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                         <button onClick={() => {
                           savePlannerResult(f);
                           setEditingFixtures(prev => ({ ...prev, [f.id]: false }));
-                        }} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded">Speichern</button>
+                        }} className="px-3 md:px-4 py-1.5 md:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded whitespace-nowrap">Speichern</button>
                       </div>
                     </div>
                     );
@@ -6062,21 +6062,21 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               ))}
             </div>
             {totalFixturePages > 1 && (
-              <div className="flex justify-center items-center gap-2 mt-3">
+              <div className="flex justify-center items-center gap-2 mt-3 md:mt-4">
                 <button
                   onClick={() => setPlannerCurrentPage(Math.max(1, currentFixturePage - 1))}
                   disabled={currentFixturePage === 1}
-                  className={`px-2 py-1 text-xs border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'}`}
+                  className={`px-3 md:px-2 py-2 md:py-1 text-sm md:text-xs border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'}`}
                 >
                   ←
                 </button>
-                <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                <span className={`text-xs md:text-sm ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
                   Seite {currentFixturePage} von {totalFixturePages}
                 </span>
                 <button
                   onClick={() => setPlannerCurrentPage(Math.min(totalFixturePages, currentFixturePage + 1))}
                   disabled={currentFixturePage === totalFixturePages}
-                  className={`px-2 py-1 text-xs border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'}`}
+                  className={`px-3 md:px-2 py-2 md:py-1 text-sm md:text-xs border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 hover:bg-slate-600' : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'}`}
                 >
                   →
                 </button>
