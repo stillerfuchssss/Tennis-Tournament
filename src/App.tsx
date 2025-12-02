@@ -26,24 +26,44 @@ BarChart3, Scale, Users2, Table2, ArrowRightCircle, Sun, Moon,
 // Auf dem echten Server (Production) nutzen wir den gleichen Pfad.
 const API_URL = (import.meta as any).env.DEV ? 'http://localhost:3000' : '';
 
+// Flag um zu verhindern, dass bei Verbindungsproblemen leere Daten gespeichert werden
+let serverConnectionOK = false;
+
 const apiSave = async (key: string, data: any) => {
+  // Sicherheitscheck: Nur speichern wenn wir erfolgreich Daten geladen haben
+  if (!serverConnectionOK) {
+    console.warn("⚠️ Speichern verhindert - Server-Verbindung noch nicht bestätigt");
+    return;
+  }
+  
   try {
-    await fetch(`${API_URL}/api/storage`, {
+    const res = await fetch(`${API_URL}/api/storage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value: data })
     });
+    if (!res.ok) {
+      console.error("Speicherfehler: Server antwortete mit", res.status);
+    }
   } catch (e) {
     console.error("Speicherfehler:", e);
   }
 };
 
-const apiLoad = async (key: string) => {
-  try {
-    const res = await fetch(`${API_URL}/api/storage/${key}`);
-    if (res.ok) return await res.json();
-  } catch (e) {
-    console.error("Ladefehler:", e);
+const apiLoad = async (key: string, retries = 3): Promise<any> => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${API_URL}/api/storage/${key}`);
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {
+      console.warn(`Ladefehler (Versuch ${attempt}/${retries}):`, e);
+      if (attempt < retries) {
+        // Warte kurz und versuche es erneut
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
   }
   return null;
 };
@@ -1480,9 +1500,7 @@ const [generationStatus, setGenerationStatus] = useState('');
 // --- INITIAL LOAD ---
 useEffect(() => {
   const loadData = async () => {
-    // HIER ÄNDERN WIR WAS:
-    
-    // Wir laden alles parallel vom Server
+    // Wir laden alles parallel vom Server (mit Retry bei Verbindungsproblemen)
     const [p, t, r, reg, bMap, a, planner, settings] = await Promise.all([
        apiLoad(STORAGE_KEYS.PLAYERS),
        apiLoad(STORAGE_KEYS.TOURNAMENTS),
@@ -1493,6 +1511,21 @@ useEffect(() => {
        apiLoad(STORAGE_KEYS.PLANNER),
        apiLoad(STORAGE_KEYS.SETTINGS)
     ]);
+
+    // Prüfe ob mindestens eine Abfrage erfolgreich war (nicht null)
+    // Das zeigt dass der Server erreichbar ist
+    const anySuccess = [p, t, r, reg, bMap, a, planner, settings].some(x => x !== null);
+    
+    if (!anySuccess) {
+      console.error("❌ Server nicht erreichbar! Daten werden NICHT überschrieben.");
+      // Zeige eine Warnung an (Toast wird später initialisiert)
+      alert("⚠️ Server-Verbindung fehlgeschlagen!\n\nDie Daten konnten nicht geladen werden. Bitte stelle sicher, dass der Server läuft und lade die Seite neu.");
+      return;
+    }
+    
+    // Server-Verbindung ist OK - ab jetzt dürfen Daten gespeichert werden
+    serverConnectionOK = true;
+    console.log("✅ Server-Verbindung erfolgreich, Daten geladen");
 
     if (p) setPlayers(p);
     if (t) {
