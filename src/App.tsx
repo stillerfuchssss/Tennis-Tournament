@@ -1742,9 +1742,7 @@ const savePlannerResult = (fixture: PlannedMatch) => {
   addMatch(p1.id, p2.id, p2.name, res1);
   addMatch(p2.id, p1.id, p1.name, res2);
   updateResults(updatedResults);
-  const newMap = { ...plannerFixtures };
-  newMap[getPlannerKey(fixture.ageGroup, fixture.level)] = (newMap[getPlannerKey(fixture.ageGroup, fixture.level)] || []).filter(f => f.id !== fixture.id);
-  updatePlannerFixtures(newMap);
+  // NICHT die Fixtures entfernen - sie bleiben und zeigen das Ergebnis an
   setPlannerScoreInput(prev => {
     const copy = { ...prev };
     delete copy[fixture.id];
