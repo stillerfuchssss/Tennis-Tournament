@@ -1742,7 +1742,13 @@ const savePlannerResult = (fixture: PlannedMatch) => {
   addMatch(p1.id, p2.id, p2.name, res1);
   addMatch(p2.id, p1.id, p1.name, res2);
   updateResults(updatedResults);
-  // NICHT die Fixtures entfernen - sie bleiben und zeigen das Ergebnis an
+
+  // Entferne das gespielte Fixture aus der Liste
+  const newMap = { ...plannerFixtures };
+  const groupKey = getPlannerKey(fixture.ageGroup, fixture.level);
+  newMap[groupKey] = (newMap[groupKey] || []).filter(f => f.id !== fixture.id);
+  updatePlannerFixtures(newMap);
+
   setPlannerScoreInput(prev => {
     const copy = { ...prev };
     delete copy[fixture.id];
@@ -5651,7 +5657,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {(['A','B','C'] as Level[]).map(level => {
   const key = getPlannerKey(plannerAgeGroup, level);
   const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
-  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId, fixtures);
+  // Zähle ALLE planner-Matches für diese Gruppe (nicht nur vom ausgewählten Turnier)
+  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, undefined, undefined, fixtures);
   const stats = unsortedStats.slice().sort((a, b) => b.points - a.points);
   const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
 
