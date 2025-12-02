@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useMemo, useRef } from 'react';
+import * as XLSX from 'xlsx';
 
 import {
 
@@ -446,123 +447,161 @@ const exportPlayersToCSV = (players: Player[]) => {
 
 const importPlayersFromCSV = (file: File, existingPlayers: Player[]): Promise<Player[]> => {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        // Unterstütze sowohl \r\n als auch \n als Zeilenumbruch
-        const lines = text.split(/\r?\n/).filter(line => line.trim());
-
-        if (lines.length < 2) {
-          reject(new Error('CSV-Datei ist leer oder ungültig'));
-          return;
-        }
-
-        // Parse Header um Spalten zu identifizieren
-        const headerLine = lines[0];
-        const headers = headerLine.split(/[,;\t]/).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
-        
-        // Finde Spalten-Indizes (flexibel für verschiedene Formate)
-        const findColumn = (...names: string[]) => {
-          for (const name of names) {
-            const idx = headers.findIndex(h => h.includes(name.toLowerCase()));
-            if (idx >= 0) return idx;
-          }
-          return -1;
-        };
-
-        const nameCol = findColumn('name', 'nachname');
-        const vornameCol = findColumn('vorname', 'firstname');
-        const clubCol = findColumn('verein', 'club');
-        const birthCol = findColumn('geburt', 'birth', 'datum');
-        const ageGroupCol = findColumn('altersklasse', 'altersk', 'age');
-        const levelCol = findColumn('niveau', 'level', 'leistung');
-        const emailCol = findColumn('email', 'mail', 'adresse');
-
-        // Überspringe Header (erste Zeile)
-        const dataLines = lines.slice(1);
-        const newPlayers: Player[] = [];
-
-        dataLines.forEach((line) => {
-          // Parse Zeile - unterstütze Komma, Semikolon und Tab als Trennzeichen
-          const delimiter = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
-          const values = line.split(delimiter).map(v => v.replace(/^"|"$/g, '').trim());
-
-          if (values.length >= 2) {
-            // Baue Namen zusammen
-            let fullName = '';
-            if (nameCol >= 0 && vornameCol >= 0 && values[nameCol] && values[vornameCol]) {
-              fullName = `${values[nameCol]} ${values[vornameCol]}`.trim();
-            } else if (nameCol >= 0 && values[nameCol]) {
-              fullName = values[nameCol];
-            } else if (values[0]) {
-              // Fallback: Erste Spalte als Name
-              fullName = vornameCol >= 0 && values[1] ? `${values[0]} ${values[1]}` : values[0];
-            }
-
-            if (!fullName) return;
-
-            // Prüfe ob Spieler bereits existiert (nach Name)
-            const exists = existingPlayers.some(p => p.name.toLowerCase() === fullName.toLowerCase());
-            if (exists) return;
-
-            // Parse Altersklasse (Excel: Bambini/Kleinfeld/Midcourt/Großfeld → App: Green/Red/Orange/Yellow)
-            let ageGroup: AgeGroup | undefined;
-            if (ageGroupCol >= 0 && values[ageGroupCol]) {
-              const ag = values[ageGroupCol].toLowerCase();
-              if (ag.includes('bambini')) ageGroup = 'Green';
-              else if (ag.includes('kleinfeld')) ageGroup = 'Red';
-              else if (ag.includes('midcourt')) ageGroup = 'Orange';
-              else if (ag.includes('großfeld') || ag.includes('grossfeld')) ageGroup = 'Yellow';
-            }
-
-            // Parse Level aus Niveau-Spalte
-            let level: Level = 'C';
-            if (levelCol >= 0 && values[levelCol]) {
-              const lv = values[levelCol].toLowerCase();
-              if (lv.includes('turniererfahren') || lv.includes('a-')) level = 'A';
-              else if (lv.includes('mittelstufe') || lv.includes('b-')) level = 'B';
-              else if (lv.includes('einsteiger') || lv.includes('c-')) level = 'C';
-              else if (lv === 'a') level = 'A';
-              else if (lv === 'b') level = 'B';
-              else if (lv === 'c') level = 'C';
-            }
-
-            // Parse Geburtsdatum
-            let birthDate: string | undefined;
-            if (birthCol >= 0 && values[birthCol]) {
-              const bd = values[birthCol];
-              // Nur Jahr (z.B. "2015")
-              if (/^\d{4}$/.test(bd)) {
-                birthDate = `${bd}-01-01`;
-              } else {
-                birthDate = bd;
-              }
-            }
-
-            newPlayers.push({
-              id: generateId(),
-              name: fullName,
-              club: clubCol >= 0 ? values[clubCol] || undefined : undefined,
-              email: emailCol >= 0 ? values[emailCol] || undefined : undefined,
-              birthDate,
-              ageGroup,
-              level,
-              isTeam: false,
-              teamMembers: []
-            });
-          }
-        });
-
-        resolve(newPlayers);
-      } catch (error) {
-        reject(new Error('Fehler beim Parsen der CSV-Datei'));
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xlsm') || file.name.endsWith('.xls');
+    
+    const processData = (rows: string[][]) => {
+      if (rows.length < 2) {
+        reject(new Error('Datei ist leer oder ungültig'));
+        return;
       }
+
+      // Finde die Header-Zeile (suche nach "Name" oder "Vorname" in einer Zeile)
+      let headerRowIndex = 0;
+      for (let i = 0; i < Math.min(rows.length, 10); i++) {
+        const rowLower = rows[i].map(c => (c || '').toString().toLowerCase());
+        if (rowLower.some(c => c.includes('name') || c.includes('vorname'))) {
+          headerRowIndex = i;
+          break;
+        }
+      }
+
+      // Parse Header um Spalten zu identifizieren
+      const headers = rows[headerRowIndex].map(h => (h || '').toString().trim().toLowerCase());
+      
+      // Finde Spalten-Indizes (flexibel für verschiedene Formate)
+      const findColumn = (...names: string[]) => {
+        for (const name of names) {
+          const idx = headers.findIndex(h => h.includes(name.toLowerCase()));
+          if (idx >= 0) return idx;
+        }
+        return -1;
+      };
+
+      const nameCol = findColumn('name', 'nachname');
+      const vornameCol = findColumn('vorname', 'firstname');
+      const clubCol = findColumn('verein', 'club');
+      const birthCol = findColumn('geburt', 'birth', 'datum');
+      const ageGroupCol = findColumn('altersklasse', 'altersk', 'age');
+      const levelCol = findColumn('niveau', 'level', 'leistung');
+      const emailCol = findColumn('email', 'mail', 'adresse');
+
+      // Überspringe Header (Zeilen bis inkl. Header-Zeile)
+      const dataRows = rows.slice(headerRowIndex + 1);
+      const newPlayers: Player[] = [];
+
+      dataRows.forEach((values) => {
+        if (values.length >= 2) {
+          // Baue Namen zusammen
+          let fullName = '';
+          const nameVal = nameCol >= 0 ? (values[nameCol] || '').toString().trim() : '';
+          const vornameVal = vornameCol >= 0 ? (values[vornameCol] || '').toString().trim() : '';
+          
+          if (nameVal && vornameVal) {
+            fullName = `${vornameVal} ${nameVal}`.trim();
+          } else if (nameVal) {
+            fullName = nameVal;
+          } else if (values[0]) {
+            // Fallback: Erste Spalte als Name
+            const v0 = (values[0] || '').toString().trim();
+            const v1 = (values[1] || '').toString().trim();
+            fullName = vornameCol >= 0 && v1 ? `${v0} ${v1}` : v0;
+          }
+
+          if (!fullName) return;
+
+          // Prüfe ob Spieler bereits existiert (nach Name)
+          const exists = existingPlayers.some(p => p.name.toLowerCase() === fullName.toLowerCase());
+          if (exists) return;
+
+          // Parse Altersklasse (Excel: Bambini/Kleinfeld/Midcourt/Großfeld → App: Green/Red/Orange/Yellow)
+          let ageGroup: AgeGroup | undefined;
+          if (ageGroupCol >= 0 && values[ageGroupCol]) {
+            const ag = values[ageGroupCol].toString().toLowerCase();
+            if (ag.includes('bambini')) ageGroup = 'Green';
+            else if (ag.includes('kleinfeld')) ageGroup = 'Red';
+            else if (ag.includes('midcourt')) ageGroup = 'Orange';
+            else if (ag.includes('großfeld') || ag.includes('grossfeld')) ageGroup = 'Yellow';
+          }
+
+          // Parse Level aus Niveau-Spalte
+          let level: Level = 'C';
+          if (levelCol >= 0 && values[levelCol]) {
+            const lv = values[levelCol].toString().toLowerCase();
+            if (lv.includes('turniererfahren') || lv.includes('a-')) level = 'A';
+            else if (lv.includes('mittelstufe') || lv.includes('b-')) level = 'B';
+            else if (lv.includes('einsteiger') || lv.includes('c-')) level = 'C';
+            else if (lv === 'a') level = 'A';
+            else if (lv === 'b') level = 'B';
+            else if (lv === 'c') level = 'C';
+          }
+
+          // Parse Geburtsdatum
+          let birthDate: string | undefined;
+          if (birthCol >= 0 && values[birthCol]) {
+            const bd = values[birthCol].toString().trim();
+            // Nur Jahr (z.B. "2015")
+            if (/^\d{4}$/.test(bd)) {
+              birthDate = `${bd}-01-01`;
+            } else {
+              birthDate = bd;
+            }
+          }
+
+          newPlayers.push({
+            id: generateId(),
+            name: fullName,
+            club: clubCol >= 0 ? (values[clubCol] || '').toString().trim() || undefined : undefined,
+            email: emailCol >= 0 ? (values[emailCol] || '').toString().trim() || undefined : undefined,
+            birthDate,
+            ageGroup,
+            level,
+            isTeam: false,
+            teamMembers: []
+          });
+        }
+      });
+
+      resolve(newPlayers);
     };
 
-    reader.onerror = () => reject(new Error('Fehler beim Lesen der Datei'));
-    reader.readAsText(file, 'UTF-8');
+    if (isExcel) {
+      // Excel-Datei (.xlsx, .xlsm, .xls)
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows: string[][] = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          processData(rows);
+        } catch (error) {
+          reject(new Error('Fehler beim Parsen der Excel-Datei'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Fehler beim Lesen der Datei'));
+      reader.readAsArrayBuffer(file);
+    } else {
+      // CSV/TXT-Datei
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split(/\r?\n/).filter(line => line.trim());
+          
+          // Parse jede Zeile in Array von Werten
+          const rows = lines.map(line => {
+            const delimiter = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
+            return line.split(delimiter).map(v => v.replace(/^"|"$/g, '').trim());
+          });
+          
+          processData(rows);
+        } catch (error) {
+          reject(new Error('Fehler beim Parsen der CSV-Datei'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Fehler beim Lesen der Datei'));
+      reader.readAsText(file, 'UTF-8');
+    }
   });
 };
 
@@ -6393,7 +6432,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       onClick={() => {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.csv,.txt';
+        input.accept = '.csv,.txt,.xlsx,.xlsm,.xls';
         input.onchange = async (e) => {
           const file = (e.target as HTMLInputElement).files?.[0];
           if (file) {
