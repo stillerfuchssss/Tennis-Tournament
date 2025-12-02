@@ -1722,7 +1722,7 @@ const savePlannerResult = (fixture: PlannedMatch) => {
     const matchId = generateId();
     const entry: MatchRecord = {
       id: matchId,
-      roundId: plannerSelectedRoundId,
+      roundId: `planner-${fixture.round}`, // Verwende fixture.round statt plannerSelectedRoundId
       opponentId,
       opponentName,
       score: playerId === p1.id ? scoreStr : reverseScoreString(scoreStr),
@@ -6025,28 +6025,39 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
                     // Wenn gespeichert und nicht im Bearbeitungsmodus
                     if (savedMatch && !isEditing) {
+                      // Berechne Punkte für gespeichertes Match
+                      const savedResult = analyzeSingleScore(savedMatch.score, savedMatch.scoringMode || plannerScoringMode);
+                      const weight = getGroupSizeWeight(participantCount);
+                      const p1SavedPoints = savedResult.isWin ? 2 * weight : (savedResult.isCloseLoss ? 1 * weight : 0);
+                      const p2SavedPoints = !savedResult.isWin ? 2 * weight : (savedResult.isCloseLoss ? 1 * weight : 0);
+
                       return (
-                        <div className={`flex items-center gap-2 px-2 py-1 rounded transition-colors ${darkMode ? 'bg-emerald-900' : 'bg-green-50'}`}>
-                          <span className={`text-xs font-mono font-bold ${darkMode ? 'text-emerald-300' : 'text-green-700'}`}>{savedMatch.score}</span>
-                          <div className="ml-auto flex gap-1">
-                            <button onClick={() => {
-                              setEditingFixtures(prev => ({ ...prev, [f.id]: true }));
-                              setPlannerScoreInput(prev => ({ ...prev, [f.id]: savedMatch.score }));
-                            }} className={`p-1 rounded transition-colors ${darkMode ? 'text-blue-400 hover:bg-slate-700' : 'text-blue-600 hover:bg-blue-100'}`} title="Bearbeiten">
-                              <Edit2 size={12}/>
-                            </button>
-                            <button onClick={() => {
-                              setConfirmDialog({
-                                isOpen: true,
-                                message: 'Dieses Spiel wirklich löschen?',
-                                onConfirm: () => {
-                                  deletePlannerResult(f);
-                                  closeConfirm();
-                                }
-                              });
-                            }} className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors" title="Löschen">
-                              <Trash2 size={12}/>
-                            </button>
+                        <div className="flex flex-col gap-1">
+                          <div className={`flex items-center gap-2 px-2 py-1 rounded transition-colors ${darkMode ? 'bg-emerald-900' : 'bg-green-50'}`}>
+                            <span className={`text-xs font-mono font-bold ${darkMode ? 'text-emerald-300' : 'text-green-700'}`}>{savedMatch.score}</span>
+                            <div className="ml-auto flex gap-1">
+                              <button onClick={() => {
+                                setEditingFixtures(prev => ({ ...prev, [f.id]: true }));
+                                setPlannerScoreInput(prev => ({ ...prev, [f.id]: savedMatch.score }));
+                              }} className={`p-1 rounded transition-colors ${darkMode ? 'text-blue-400 hover:bg-slate-700' : 'text-blue-600 hover:bg-blue-100'}`} title="Bearbeiten">
+                                <Edit2 size={12}/>
+                              </button>
+                              <button onClick={() => {
+                                setConfirmDialog({
+                                  isOpen: true,
+                                  message: 'Dieses Spiel wirklich löschen?',
+                                  onConfirm: () => {
+                                    deletePlannerResult(f);
+                                    closeConfirm();
+                                  }
+                                });
+                              }} className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors" title="Löschen">
+                                <Trash2 size={12}/>
+                              </button>
+                            </div>
+                          </div>
+                          <div className={`text-[10px] px-2 py-1 rounded transition-colors ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-blue-50 text-slate-600'}`}>
+                            ✓ <span className="truncate inline-block max-w-[80px] align-bottom">{resolveName(f.p1Id)}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p1SavedPoints.toFixed(1)}P</b> • <span className="truncate inline-block max-w-[80px] align-bottom">{resolveName(f.p2Id)}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p2SavedPoints.toFixed(1)}P</b>
                           </div>
                         </div>
                       );
