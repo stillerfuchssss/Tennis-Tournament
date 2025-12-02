@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo, useRef } from 'react';
 
 import {
 
@@ -365,30 +365,71 @@ REGISTRATIONS: 'tm_registrations',
 BRACKETS: 'tm_brackets_map', // Changed from single bracket to map
 
 ADMINS: 'tm_admins',
-PLANNER: 'tm_planner_fixtures'
+PLANNER: 'tm_planner_fixtures',
+SETTINGS: 'tm_settings'
 
 };
 
 // --- CSV IMPORT/EXPORT HELPERS ---
 const exportPlayersToCSV = (players: Player[]) => {
-  // CSV Header
-  const headers = ['Name', 'Verein', 'Email', 'Geburtsdatum', 'Altersklasse', 'Level', 'Ist Team'];
+  // CSV Header - gleiches Format wie Excel-Meldeliste
+  const headers = ['Name', 'Vorname', 'Verein', 'Geburtsdatum', 'Altersklasse', 'Niveau', 'Emailadresse'];
+
+  // Mapping AgeGroup zu Excel-Namen (umgekehrt zum Import)
+  const ageGroupToExcel: Record<AgeGroup, string> = {
+    Green: 'Bambini',
+    Red: 'Kleinfeld', 
+    Orange: 'Midcourt',
+    Yellow: 'Großfeld'
+  };
+
+  // Mapping Level zu Niveau-Namen (exakt wie in der Excel-Meldeliste)
+  const levelToNiveau: Record<Level, string> = {
+    A: 'A-Turniererfahrene',
+    B: 'B-Mittelstufe',
+    C: 'C-Einsteiger'
+  };
 
   // CSV Rows
-  const rows = players.map(p => [
-    p.name,
-    p.club || '',
-    p.email || '',
-    p.birthDate || '',
-    p.ageGroup || '',
-    p.level || '',
-    p.isTeam ? 'Ja' : 'Nein'
-  ]);
+  const rows = players.map(p => {
+    // Name aufteilen in Nachname und Vorname
+    // Format "Vorname Nachname" → Name=Nachname, Vorname=Vorname
+    const nameParts = p.name.trim().split(' ');
+    let nachname = p.name;
+    let vorname = '';
+    if (nameParts.length >= 2) {
+      nachname = nameParts[nameParts.length - 1]; // Letztes Wort = Nachname
+      vorname = nameParts.slice(0, -1).join(' '); // Rest = Vorname
+    }
+    
+    // Geburtsdatum: nur das Jahr extrahieren
+    let birthYear = '';
+    if (p.birthDate) {
+      if (p.birthDate.includes('-')) {
+        birthYear = p.birthDate.split('-')[0];
+      } else if (p.birthDate.includes('.')) {
+        const parts = p.birthDate.split('.');
+        birthYear = parts[parts.length - 1];
+      } else if (/^\d{4}$/.test(p.birthDate)) {
+        birthYear = p.birthDate;
+      }
+    }
+    
+    return [
+      nachname,
+      vorname,
+      p.club || '',
+      birthYear,
+      p.ageGroup ? ageGroupToExcel[p.ageGroup] : '',
+      p.level ? levelToNiveau[p.level] : '',
+      p.email || ''
+    ];
+  });
 
-  // Kombiniere Headers und Rows
+  // Kombiniere Headers und Rows mit Semikolon (Excel-Standard DE)
   const csvContent = [
-    headers.join(','),
-    ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    headers.join(';'),
+    ...rows.map(row => row.join(';'))
   ].join('\n');
 
   // Download-Trigger
@@ -396,7 +437,7 @@ const exportPlayersToCSV = (players: Player[]) => {
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
   link.setAttribute('href', url);
-  link.setAttribute('download', `spieler_export_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `meldeliste_export_${new Date().toISOString().split('T')[0]}.csv`);
   link.style.visibility = 'hidden';
   document.body.appendChild(link);
   link.click();
@@ -410,41 +451,107 @@ const importPlayersFromCSV = (file: File, existingPlayers: Player[]): Promise<Pl
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
+        // Unterstütze sowohl \r\n als auch \n als Zeilenumbruch
+        const lines = text.split(/\r?\n/).filter(line => line.trim());
 
         if (lines.length < 2) {
           reject(new Error('CSV-Datei ist leer oder ungültig'));
           return;
         }
 
+        // Parse Header um Spalten zu identifizieren
+        const headerLine = lines[0];
+        const headers = headerLine.split(/[,;\t]/).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+        
+        // Finde Spalten-Indizes (flexibel für verschiedene Formate)
+        const findColumn = (...names: string[]) => {
+          for (const name of names) {
+            const idx = headers.findIndex(h => h.includes(name.toLowerCase()));
+            if (idx >= 0) return idx;
+          }
+          return -1;
+        };
+
+        const nameCol = findColumn('name', 'nachname');
+        const vornameCol = findColumn('vorname', 'firstname');
+        const clubCol = findColumn('verein', 'club');
+        const birthCol = findColumn('geburt', 'birth', 'datum');
+        const ageGroupCol = findColumn('altersklasse', 'altersk', 'age');
+        const levelCol = findColumn('niveau', 'level', 'leistung');
+        const emailCol = findColumn('email', 'mail', 'adresse');
+
         // Überspringe Header (erste Zeile)
         const dataLines = lines.slice(1);
-
         const newPlayers: Player[] = [];
 
         dataLines.forEach((line) => {
-          // Parse CSV-Zeile (berücksichtige Anführungszeichen)
-          const values = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g)?.map(v => v.replace(/^"|"$/g, '').trim()) || [];
+          // Parse Zeile - unterstütze Komma, Semikolon und Tab als Trennzeichen
+          const delimiter = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
+          const values = line.split(delimiter).map(v => v.replace(/^"|"$/g, '').trim());
 
-          if (values.length >= 6) {
-            const [name, club, email, birthDate, ageGroup, level, isTeamStr] = values;
+          if (values.length >= 2) {
+            // Baue Namen zusammen
+            let fullName = '';
+            if (nameCol >= 0 && vornameCol >= 0 && values[nameCol] && values[vornameCol]) {
+              fullName = `${values[nameCol]} ${values[vornameCol]}`.trim();
+            } else if (nameCol >= 0 && values[nameCol]) {
+              fullName = values[nameCol];
+            } else if (values[0]) {
+              // Fallback: Erste Spalte als Name
+              fullName = vornameCol >= 0 && values[1] ? `${values[0]} ${values[1]}` : values[0];
+            }
+
+            if (!fullName) return;
 
             // Prüfe ob Spieler bereits existiert (nach Name)
-            const exists = existingPlayers.some(p => p.name.toLowerCase() === name.toLowerCase());
+            const exists = existingPlayers.some(p => p.name.toLowerCase() === fullName.toLowerCase());
+            if (exists) return;
 
-            if (!exists && name) {
-              newPlayers.push({
-                id: generateId(),
-                name,
-                club: club || undefined,
-                email: email || undefined,
-                birthDate: birthDate || undefined,
-                ageGroup: (ageGroup as AgeGroup) || undefined,
-                level: (level as Level) || 'C',
-                isTeam: isTeamStr?.toLowerCase() === 'ja' || isTeamStr?.toLowerCase() === 'yes',
-                teamMembers: []
-              });
+            // Parse Altersklasse (Excel: Bambini/Kleinfeld/Midcourt/Großfeld → App: Green/Red/Orange/Yellow)
+            let ageGroup: AgeGroup | undefined;
+            if (ageGroupCol >= 0 && values[ageGroupCol]) {
+              const ag = values[ageGroupCol].toLowerCase();
+              if (ag.includes('bambini')) ageGroup = 'Green';
+              else if (ag.includes('kleinfeld')) ageGroup = 'Red';
+              else if (ag.includes('midcourt')) ageGroup = 'Orange';
+              else if (ag.includes('großfeld') || ag.includes('grossfeld')) ageGroup = 'Yellow';
             }
+
+            // Parse Level aus Niveau-Spalte
+            let level: Level = 'C';
+            if (levelCol >= 0 && values[levelCol]) {
+              const lv = values[levelCol].toLowerCase();
+              if (lv.includes('turniererfahren') || lv.includes('a-')) level = 'A';
+              else if (lv.includes('mittelstufe') || lv.includes('b-')) level = 'B';
+              else if (lv.includes('einsteiger') || lv.includes('c-')) level = 'C';
+              else if (lv === 'a') level = 'A';
+              else if (lv === 'b') level = 'B';
+              else if (lv === 'c') level = 'C';
+            }
+
+            // Parse Geburtsdatum
+            let birthDate: string | undefined;
+            if (birthCol >= 0 && values[birthCol]) {
+              const bd = values[birthCol];
+              // Nur Jahr (z.B. "2015")
+              if (/^\d{4}$/.test(bd)) {
+                birthDate = `${bd}-01-01`;
+              } else {
+                birthDate = bd;
+              }
+            }
+
+            newPlayers.push({
+              id: generateId(),
+              name: fullName,
+              club: clubCol >= 0 ? values[clubCol] || undefined : undefined,
+              email: emailCol >= 0 ? values[emailCol] || undefined : undefined,
+              birthDate,
+              ageGroup,
+              level,
+              isTeam: false,
+              teamMembers: []
+            });
           }
         });
 
@@ -926,6 +1033,61 @@ const importBackup = (file: File): Promise<any> => {
   });
 };
 
+// Komponente für Score-Input mit lokaler Live-Vorschau (performant)
+const ScoreInputWithPreview = ({ 
+  fixtureId, 
+  defaultValue, 
+  p1Name, 
+  p2Name, 
+  weight, 
+  scoringMode, 
+  darkMode,
+  analyzeSingleScore: analyze 
+}: { 
+  fixtureId: string;
+  defaultValue: string;
+  p1Name: string;
+  p2Name: string;
+  weight: number;
+  scoringMode: ScoringMode;
+  darkMode: boolean;
+  analyzeSingleScore: (score: string, mode: ScoringMode) => { isWin: boolean; isCloseLoss: boolean };
+}) => {
+  const [localScore, setLocalScore] = useState(defaultValue);
+  
+  // Analysiere aus P1 Perspektive
+  const resultP1 = localScore ? analyze(localScore, scoringMode) : null;
+  // Analysiere aus P2 Perspektive (umgekehrter Score)
+  const reversedScore = localScore ? localScore.split(' ').map(set => {
+    const [p1, p2] = set.split(':');
+    return `${p2}:${p1}`;
+  }).join(' ') : '';
+  const resultP2 = reversedScore ? analyze(reversedScore, scoringMode) : null;
+  
+  // Korrekte Punkte-Berechnung:
+  // Gewinner bekommt 2, Verlierer bekommt 1 bei knapper Niederlage
+  const p1Points = resultP1 ? (resultP1.isWin ? 2 * weight : (resultP1.isCloseLoss ? 1 * weight : 0)) : 0;
+  const p2Points = resultP2 ? (resultP2.isWin ? 2 * weight : (resultP2.isCloseLoss ? 1 * weight : 0)) : 0;
+
+  return (
+    <>
+      <input
+        type="text"
+        id={`score-input-${fixtureId}`}
+        placeholder="z.B. 6:4 4:6 10:8"
+        className={`w-full p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
+        value={localScore}
+        onChange={e => setLocalScore(e.target.value)}
+      />
+      {localScore && resultP1 && (
+        <div className={`text-[10px] px-2 py-1 rounded transition-colors overflow-hidden ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-blue-50 text-slate-600'}`}>
+          💡 <span className="truncate inline-block max-w-[80px] align-bottom">{p1Name}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p1Points.toFixed(1)}P</b> • <span className="truncate inline-block max-w-[80px] align-bottom">{p2Name}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p2Points.toFixed(1)}P</b> <span className="text-slate-400">(×{weight.toFixed(2)})</span>
+        </div>
+      )}
+    </>
+  );
+};
+
 const TennisManager = () => {
 
 // --- STATE ---
@@ -1189,6 +1351,15 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
     localStorage.setItem('showTournamentField', JSON.stringify(showTournamentField));
   }, [showTournamentField]);
 
+  // Tournament Menu Setting Persistence (auf Server speichern)
+  const settingsLoadedRef = useRef(false);
+  
+  useEffect(() => {
+    // Erst speichern nachdem die Settings geladen wurden
+    if (!settingsLoadedRef.current) return;
+    saveData(STORAGE_KEYS.SETTINGS, { enableTournamentMenu });
+  }, [enableTournamentMenu]);
+
 
 // Generator Config
 
@@ -1210,14 +1381,15 @@ useEffect(() => {
     // HIER ÄNDERN WIR WAS:
     
     // Wir laden alles parallel vom Server
-    const [p, t, r, reg, bMap, a, planner] = await Promise.all([
+    const [p, t, r, reg, bMap, a, planner, settings] = await Promise.all([
        apiLoad(STORAGE_KEYS.PLAYERS),
        apiLoad(STORAGE_KEYS.TOURNAMENTS),
        apiLoad(STORAGE_KEYS.RESULTS),
        apiLoad(STORAGE_KEYS.REGISTRATIONS),
        apiLoad(STORAGE_KEYS.BRACKETS),
        apiLoad(STORAGE_KEYS.ADMINS),
-       apiLoad(STORAGE_KEYS.PLANNER)
+       apiLoad(STORAGE_KEYS.PLANNER),
+       apiLoad(STORAGE_KEYS.SETTINGS)
     ]);
 
     if (p) setPlayers(p);
@@ -1229,6 +1401,9 @@ useEffect(() => {
     if (reg) setPendingRegistrations(reg);
     if (bMap) setBrackets(bMap);
     if (planner) setPlannerFixtures(planner);
+    if (settings) {
+      if (settings.enableTournamentMenu !== undefined) setEnableTournamentMenu(settings.enableTournamentMenu);
+    }
     
     // Admin Init
     if (a) {
@@ -1245,6 +1420,9 @@ useEffect(() => {
       // WICHTIG: Auch gleich speichern!
       apiSave(STORAGE_KEYS.ADMINS, [defaultAdmin]);
     }
+    
+    // Settings wurden geladen - ab jetzt dürfen Änderungen gespeichert werden
+    settingsLoadedRef.current = true;
   };
 
   loadData();
@@ -1514,16 +1692,16 @@ if (ageGroup && level) {
   }
 }
 
-// Finde die größte Gruppe in der gleichen Altersklasse UND Leistungsklasse
-// = Anzahl ALLER Spieler mit dieser Kombination (unabhängig von Turnier/Spieltag)
+// Finde die größte Gruppe ÜBER ALLE Leistungsklassen in dieser Altersklasse
+// Das sorgt dafür, dass kleinere Leistungsklassen eine höhere Gewichtung bekommen
 let maxGroupSize = participantCount; // Mindestens die aktuelle Gruppe
 
-if (ageGroup && level) {
-  // Zähle alle Spieler mit dieser Altersklasse UND Leistungsklasse
-  maxGroupSize = players.filter(p => calculateAgeGroup(p) === ageGroup && p.level === level).length;
-
-  // Falls die aktuelle Gruppe größer ist (sollte nicht vorkommen), verwende sie
-  if (participantCount > maxGroupSize) maxGroupSize = participantCount;
+if (ageGroup) {
+  // Finde die größte Gruppe in dieser Altersklasse (über alle Levels A, B, C)
+  const levelCounts = (['A', 'B', 'C'] as Level[]).map(l => 
+    players.filter(p => calculateAgeGroup(p) === ageGroup && p.level === l).length
+  );
+  maxGroupSize = Math.max(...levelCounts, participantCount);
 }
 
 // Faire Gewichtungsberechnung mit Dämpfungsfaktor:
@@ -1574,71 +1752,94 @@ const generateRoundRobin = (ids: string[], mode: 'single' | 'double') => {
   return fixtures;
 };
 
-const collectPlannerStats = (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string, groupFixtures?: PlannedMatch[]) => {
-  // Sammle Spieler-IDs, die in den Fixtures dieser Gruppe vorkommen
-  const fixturePlayerIds = new Set<string>();
-  if (groupFixtures) {
-    groupFixtures.forEach(f => {
-      fixturePlayerIds.add(f.p1Id);
-      fixturePlayerIds.add(f.p2Id);
-    });
-  }
-
-  // Filtere Spieler: Nur die, die entweder in Fixtures vorkommen oder gespeicherte planner-Ergebnisse haben
-  const eligible = players.filter(p => {
-    if (calculateAgeGroup(p) !== age || p.level !== level) return false;
-
-    // Spieler ist in Fixtures enthalten
-    if (fixturePlayerIds.has(p.id)) return true;
-
-    // ODER Spieler hat gespeicherte planner-Ergebnisse in dieser Gruppe
-    const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
-    if (res) {
-      // Nur planner-Matches berücksichtigen (roundId beginnt mit "planner-")
-      const hasPlannerMatches = res.matches.some(m =>
-        m.roundId && m.roundId.startsWith('planner-') && getMatchLevel(m, p.level || null) === level
-      );
-      if (hasPlannerMatches) return true;
+const collectPlannerStats = useMemo(() => {
+  // Cache für berechnete Stats
+  const cache = new Map<string, { stats: any[], weight: number, participantCount: number }>();
+  
+  return (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string, groupFixtures?: PlannedMatch[]) => {
+    // Cache-Key erstellen
+    const cacheKey = `${age}-${level}-${tournamentId || ''}-${roundId || ''}-${groupFixtures?.length || 0}`;
+    
+    // Prüfe ob im Cache
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+    
+    // Sammle Spieler-IDs, die in den Fixtures dieser Gruppe vorkommen
+    const fixturePlayerIds = new Set<string>();
+    if (groupFixtures) {
+      groupFixtures.forEach(f => {
+        fixturePlayerIds.add(f.p1Id);
+        fixturePlayerIds.add(f.p2Id);
+      });
     }
 
-    return false;
-  });
+    // Filtere Spieler: Nur die, die entweder in Fixtures vorkommen oder irgendwelche Matches haben (planner oder normale)
+    const eligible = players.filter(p => {
+      if (calculateAgeGroup(p) !== age || p.level !== level) return false;
 
-  // Für die Anzeige verwenden wir alle eligible Spieler
-  const participantCount = eligible.length;
+      // Spieler ist in Fixtures enthalten
+      if (fixturePlayerIds.has(p.id)) return true;
 
-  // Für die Gewichtungsberechnung verwenden wir nur die Spieler, die aktuell in Fixtures sind
-  // (nicht die mit alten Matches, die keine Fixtures mehr haben)
-  const fixtureParticipantCount = fixturePlayerIds.size > 0 ? fixturePlayerIds.size : participantCount;
-  const weight = getGroupSizeWeight(fixtureParticipantCount, age, level);
-  const stats = eligible.map(p => {
-    const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
-    // Nur planner-Matches für dieses Level berücksichtigen
-    let matches = res ? res.matches.filter(m =>
-      m.roundId && m.roundId.startsWith('planner-') && getMatchLevel(m, p.level || null) === level
-    ) : [];
+      // ODER Spieler hat irgendwelche Matches in dieser Gruppe (planner oder normal)
+      const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
+      if (res) {
+        // Prüfe ob dieser Spieler Matches hat die zu dieser Altersgruppe/Level gehören
+        const hasMatches = res.matches.some(m =>
+          getMatchLevel(m, p.level || null) === level
+        );
+        if (hasMatches) return true;
+      }
 
-    // Filtere nach roundId wenn angegeben
-    if (roundId) {
-      matches = matches.filter(m => m.roundId === roundId);
-    }
-
-    let wins = 0, close = 0, losses = 0;
-    // Teilnahme pro Turniertag: wir zählen jedes RoundId einmal, wenn ein Match dort vorliegt
-    const roundIds = new Set<string>();
-    matches.forEach(m => {
-      if (m.isWin) wins++;
-      else if (m.isCloseLoss) close++;
-      else losses++;
-      if (m.roundId) roundIds.add(m.roundId);
+      return false;
     });
-    const basePoints = wins * 2 + close * 1;
-    const participationPoints = roundIds.size; // 1 Punkt pro Spieltag
-    const points = parseFloat((basePoints * weight + participationPoints).toFixed(1));
-    return { player: p, wins, losses, close, points, weight, participationPoints };
-  });
-  return { stats, weight, participantCount };
-};
+
+    // Für die Anzeige verwenden wir alle eligible Spieler
+    const participantCount = eligible.length;
+
+    // Für die Gewichtungsberechnung verwenden wir nur die Spieler, die aktuell in Fixtures sind
+    // (nicht die mit alten Matches, die keine Fixtures mehr haben)
+    const fixtureParticipantCount = fixturePlayerIds.size > 0 ? fixturePlayerIds.size : participantCount;
+    const weight = getGroupSizeWeight(fixtureParticipantCount, age, level);
+    const stats = eligible.map(p => {
+      const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
+      // Sammle ALLE Matches (planner und normale) für dieses Level
+      let matches = res ? res.matches.filter(m =>
+        getMatchLevel(m, p.level || null) === level
+      ) : [];
+
+      // Filtere nach roundId wenn angegeben
+      // Hinweis: roundId kann eine normale Round-ID sein oder eine planner-ID
+      if (roundId) {
+        matches = matches.filter(m => {
+          // Match hat die exakt angegebene roundId
+          if (m.roundId === roundId) return true;
+          // Match ist ein planner-Match für diese Runde
+          if (m.roundId === `planner-${roundId}`) return true;
+          // Match wurde für den gleichen Spieltag erfasst (normale Eingabe)
+          return false;
+        });
+      }
+
+      let wins = 0, close = 0, losses = 0;
+      // Teilnahme pro Turniertag: wir zählen jedes RoundId einmal, wenn ein Match dort vorliegt
+      const roundIds = new Set<string>();
+      matches.forEach(m => {
+        if (m.isWin) wins++;
+        else if (m.isCloseLoss) close++;
+        else losses++;
+        if (m.roundId) roundIds.add(m.roundId);
+      });
+      const basePoints = wins * 2 + close * 1;
+      const participationPoints = roundIds.size; // 1 Punkt pro Spieltag
+      const points = parseFloat(((basePoints + participationPoints) * weight).toFixed(1));
+      return { player: p, wins, losses, close, points, weight, participationPoints };
+    });
+    
+    const result = { stats, weight, participantCount };
+    cache.set(cacheKey, result);
+    return result;
+  };
+}, [players, results, customGroupWeights]);
 
 const generatePlannerForAgeGroup = (age: AgeGroup) => {
   const newMap = { ...plannerFixtures };
@@ -1680,7 +1881,7 @@ const deletePlannerResult = (fixture: PlannedMatch) => {
     );
     if (playerResultIdx >= 0) {
       updatedResults[playerResultIdx].matches = updatedResults[playerResultIdx].matches.filter(
-        m => !(m.roundId === plannerSelectedRoundId &&
+        m => !(m.roundId === `planner-${plannerSelectedRoundId}` &&
                (m.opponentId === p1.id || m.opponentId === p2.id))
       );
       // Entferne leere Result-Einträge
@@ -1702,24 +1903,30 @@ const deletePlannerResult = (fixture: PlannedMatch) => {
   addToast('Spiel gelöscht', 'info');
 };
 
-const savePlannerResult = (fixture: PlannedMatch) => {
+const savePlannerResult = (fixture: PlannedMatch, directScore?: string) => {
   if (!isAdmin) return;
-  const scoreStr = (plannerScoreInput[fixture.id] || '').trim();
+  const scoreStr = (directScore || plannerScoreInput[fixture.id] || '').trim();
   if (!scoreStr) { addToast('Bitte Spielstand eintragen', 'error'); return; }
+
+  // Prüfe ob Turnier und Spieltag ausgewählt sind
+  if (!plannerSelectedTournamentId || !plannerSelectedRoundId) {
+    addToast('Bitte wähle zuerst ein Turnier und einen Spieltag aus', 'error');
+    return;
+  }
+
   const p1 = players.find(p => p.id === fixture.p1Id);
   const p2 = players.find(p => p.id === fixture.p2Id);
   if (!p1 || !p2) { addToast('Spieler nicht gefunden', 'error'); return; }
   const mode = plannerScoringMode;
   const res1 = analyzeSingleScore(scoreStr, mode);
   const res2 = analyzeSingleScore(reverseScoreString(scoreStr), mode);
-  // Verwende ausgewähltes Turnier oder "planner-default"
-  const tournamentId = plannerSelectedTournamentId || 'planner-default';
+  const tournamentId = plannerSelectedTournamentId;
   let updatedResults = [...results];
   const addMatch = (playerId: string, opponentId: string, opponentName: string, res: {isWin:boolean; isCloseLoss:boolean}) => {
     const matchId = generateId();
     const entry: MatchRecord = {
       id: matchId,
-      roundId: `planner-${fixture.round}`, // Verwende fixture.round statt plannerSelectedRoundId
+      roundId: `planner-${plannerSelectedRoundId}`, // Kombiniere "planner-" Präfix mit Tournament-Round-ID
       opponentId,
       opponentName,
       score: playerId === p1.id ? scoreStr : reverseScoreString(scoreStr),
@@ -2539,10 +2746,13 @@ if (mode !== 'sets') {
   let isCloseLoss = false;
   if (!isWin) {
     if (mode === 'race4') {
-      isCloseLoss = (p2 >= 4 && p1 >= 3 && diff === 1);
+      // Race-4: Keine knappe Niederlage
+      isCloseLoss = false;
     } else if (mode === 'race10') {
+      // Race-10: Knapp bei 10:8, 10:9 etc. (Verlierer mindestens 8)
       isCloseLoss = (p2 >= 10 && p1 >= 8 && diff <= 2);
     } else if (mode === 'race15') {
+      // Race-15: Knapp ab 12:15 (Verlierer mindestens 12)
       isCloseLoss = (p2 >= 15 && p1 >= 12 && diff <= 3);
     } else {
       isCloseLoss = false;
@@ -4736,12 +4946,11 @@ className={`px-2 md:px-4 py-1 md:py-1.5 text-[10px] md:text-xs border rounded-lg
 
 <li><b>Sieg:</b> 2 Punkte (x Gruppengewicht)</li>
 
-<li><b>Knappe Niederlage:</b> 1 Punkt (x Gruppengewicht)</li>
+<li><b>Knappe Niederlage:</b> 1 Punkt (x Gruppengewicht) – Race-4 (keine), Race-10 (knapp ab 8:10), Race-15 (knapp ab 12:15)</li>
 
 <li><b>Teilnahme:</b> 1 Punkt (ohne Gewichtung)</li>
 
-<li><b>Gruppengewicht:</b> Basis ist die groesste Gruppe gleicher Alters- & Leistungsklasse. Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.5), grosse Gruppen werden nicht bestraft (min 1.0).</li>
-<li><b>Zählweisen:</b> Race-4 (knapp bei 4:3), Race-10 (knapp bei 10:9), Race-15 (knapp bis max. 2-3 Punkte Differenz ab 15).</li>
+<li><b>Gruppengewicht:</b> Basis ist die größte Gruppe der gleichen Altersklasse (über alle Leistungsklassen A/B/C). Kleinere Gruppen bekommen etwas mehr Punkte (gedämpft, max ~20% Bonus), große Gruppen werden nicht bestraft (min 1.0).</li>
 
 </ul>
 
@@ -5503,18 +5712,23 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               playerIds.add(f.p2Id);
             });
 
-            // Entferne ALLE gespeicherten Ergebnisse, die zu diesen Fixtures gehören
+            // Entferne ALLE gespeicherten Ergebnisse für diese Altersgruppe und Level
+            // (sowohl planner- als auch normale Matches)
             const updatedResults = results.map(playerResult => {
+              const player = players.find(p => p.id === playerResult.playerId);
+              if (!player) return playerResult;
+              
+              // Prüfe ob der Spieler in dieser Altersgruppe ist
+              const playerAgeGroup = calculateAgeGroup(player);
+              if (playerAgeGroup !== plannerAgeGroup) return playerResult;
+              
               return {
                 ...playerResult,
                 matches: playerResult.matches.filter(m => {
-                  // Prüfe ob dieses Match zu einem der zu löschenden Fixtures gehört
-                  const belongsToDeletedFixture = allFixturesToDelete.some(f =>
-                    m.roundId === `planner-${f.round}` &&
-                    ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
-                     (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
-                  );
-                  return !belongsToDeletedFixture;
+                  // Behalte Matches die NICHT zu einem der gelöschten Level gehören
+                  const matchLevel = getMatchLevel(m, player.level || null);
+                  const shouldDelete = levels.includes(matchLevel as Level);
+                  return !shouldDelete;
                 })
               };
             });
@@ -5654,8 +5868,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {(['A','B','C'] as Level[]).map(level => {
   const key = getPlannerKey(plannerAgeGroup, level);
   const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
-  // Zähle ALLE planner-Matches für diese Gruppe (nicht nur vom ausgewählten Turnier)
-  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, undefined, undefined, fixtures);
+  // Zeige ALLE Ergebnisse für das ausgewählte Turnier (nicht nach Spieltag gefiltert, damit Punkte korrekt angezeigt werden)
+  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, undefined, fixtures);
   const stats = unsortedStats.slice().sort((a, b) => b.points - a.points);
   const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
 
@@ -5882,7 +6096,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                   <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-orange-600 dark:text-orange-400 hidden sm:table-cell flex-shrink-0">{s.close}</td>
                   <td className="px-2 md:px-4 py-2 md:py-3.5 text-center font-semibold text-xs md:text-base text-red-600 dark:text-red-400 flex-shrink-0">{s.losses}</td>
                   <td className="px-2 md:px-4 py-2 md:py-3.5 text-right flex-shrink-0">
-                    <span className="text-base md:text-xl font-black bg-gradient-to-r from-emerald-600 to-green-600 dark:from-emerald-400 dark:to-green-400 bg-clip-text text-transparent">
+                    <span className="text-base md:text-xl font-black text-emerald-600 dark:text-emerald-400">
                       {s.points.toFixed(1)}
                     </span>
                     <span className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 ml-1">Pkt</span>
@@ -6016,24 +6230,29 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                     </div>
                   )}
                   {isAdmin && (() => {
-                    // Prüfe ob Match bereits gespeichert wurde
-                    const p1Result = results.find(r => r.playerId === f.p1Id);
-                    const savedMatch = p1Result?.matches.find(m => m.roundId === `planner-${f.round}` && m.opponentId === f.p2Id);
+                    // Prüfe ob Match bereits gespeichert wurde (sowohl planner- als auch normale roundId)
+                    const p1Result = results.find(r => r.playerId === f.p1Id && r.tournamentId === plannerSelectedTournamentId);
+                    const savedMatch = p1Result?.matches.find(m => 
+                      (m.roundId === `planner-${f.round}` || m.roundId === plannerSelectedRoundId) && 
+                      m.opponentId === f.p2Id
+                    );
                     const isEditing = editingFixtures[f.id] || false;
 
                     const scoreStr = plannerScoreInput[f.id] || (isEditing && savedMatch ? savedMatch.score : '');
-                    const result = scoreStr ? analyzeSingleScore(scoreStr, plannerScoringMode) : null;
-                    const weight = getGroupSizeWeight(participantCount);
-                    const p1Points = result ? (result.isWin ? 2 * weight : result.isCloseLoss ? 1 * weight : 0) : 0;
-                    const p2Points = result ? (!result.isWin ? 2 * weight : result.isCloseLoss ? 1 * weight : 0) : 0;
+                    const weight = getGroupSizeWeight(participantCount, plannerAgeGroup, level);
 
                     // Wenn gespeichert und nicht im Bearbeitungsmodus
                     if (savedMatch && !isEditing) {
-                      // Berechne Punkte für gespeichertes Match
-                      const savedResult = analyzeSingleScore(savedMatch.score, savedMatch.scoringMode || plannerScoringMode);
-                      const weight = getGroupSizeWeight(participantCount);
-                      const p1SavedPoints = savedResult.isWin ? 2 * weight : (savedResult.isCloseLoss ? 1 * weight : 0);
-                      const p2SavedPoints = !savedResult.isWin ? 2 * weight : (savedResult.isCloseLoss ? 1 * weight : 0);
+                      // Berechne Punkte für gespeichertes Match - aus Perspektive beider Spieler
+                      const savedResultP1 = analyzeSingleScore(savedMatch.score, savedMatch.scoringMode || plannerScoringMode);
+                      const reversedSavedScore = savedMatch.score.split(' ').map((set: string) => {
+                        const [p1, p2] = set.split(':');
+                        return `${p2}:${p1}`;
+                      }).join(' ');
+                      const savedResultP2 = analyzeSingleScore(reversedSavedScore, savedMatch.scoringMode || plannerScoringMode);
+                      // Gewinner bekommt 2, Verlierer bekommt 1 bei knapper Niederlage
+                      const p1SavedPoints = savedResultP1.isWin ? 2 * weight : (savedResultP1.isCloseLoss ? 1 * weight : 0);
+                      const p2SavedPoints = savedResultP2.isWin ? 2 * weight : (savedResultP2.isCloseLoss ? 1 * weight : 0);
 
                       return (
                         <div className="flex flex-col gap-1">
@@ -6069,18 +6288,16 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
                     return (
                     <div className="flex flex-col gap-2">
-                      <input
-                        type="text"
-                        placeholder="z.B. 6:4 4:6 10:8"
-                        className={`w-full p-2 border rounded text-xs transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600 placeholder-slate-400' : 'bg-white text-slate-900 border-slate-300 placeholder-slate-600'}`}
-                        value={scoreStr}
-                        onChange={e => setPlannerScoreInput(prev => ({ ...prev, [f.id]: e.target.value }))}
+                      <ScoreInputWithPreview
+                        fixtureId={f.id}
+                        defaultValue={scoreStr}
+                        p1Name={resolveName(f.p1Id)}
+                        p2Name={resolveName(f.p2Id)}
+                        weight={weight}
+                        scoringMode={plannerScoringMode}
+                        darkMode={darkMode}
+                        analyzeSingleScore={analyzeSingleScore}
                       />
-                      {scoreStr && result && (
-                        <div className={`text-[10px] px-2 py-1 rounded transition-colors overflow-hidden ${darkMode ? 'bg-slate-800 text-slate-300' : 'bg-blue-50 text-slate-600'}`}>
-                          💡 <span className="truncate inline-block max-w-[80px] align-bottom">{resolveName(f.p1Id)}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p1Points.toFixed(1)}P</b> • <span className="truncate inline-block max-w-[80px] align-bottom">{resolveName(f.p2Id)}</span>: <b className={darkMode ? 'text-emerald-400' : 'text-emerald-700'}>{p2Points.toFixed(1)}P</b>
-                        </div>
-                      )}
                       <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                         <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className={`flex-1 text-xs p-1.5 md:p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
                           <option value="race4">Zählweise: bis 4</option>
@@ -6089,7 +6306,10 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                           <option value="sets">Zählweise: Sätze</option>
                         </select>
                         <button onClick={() => {
-                          savePlannerResult(f);
+                          // Lese den aktuellen Wert direkt aus dem Input-Feld und speichere sofort
+                          const inputEl = document.getElementById(`score-input-${f.id}`) as HTMLInputElement;
+                          const currentValue = inputEl?.value || '';
+                          savePlannerResult(f, currentValue);
                           setEditingFixtures(prev => ({ ...prev, [f.id]: false }));
                         }} className="px-3 md:px-4 py-1.5 md:py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-bold rounded whitespace-nowrap">Speichern</button>
                       </div>
@@ -6173,7 +6393,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       onClick={() => {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.csv';
+        input.accept = '.csv,.txt';
         input.onchange = async (e) => {
           const file = (e.target as HTMLInputElement).files?.[0];
           if (file) {
@@ -6183,7 +6403,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 updatePlayers([...players, ...newPlayers]);
                 addToast(`${newPlayers.length} Spieler importiert`, 'success');
               } else {
-                addToast('Keine neuen Spieler zum Importieren gefunden', 'info');
+                addToast('Keine neuen Spieler zum Importieren gefunden (evtl. bereits vorhanden)', 'info');
               }
             } catch (error) {
               addToast((error as Error).message, 'error');
@@ -6193,9 +6413,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
         input.click();
       }}
       className="bg-blue-600 text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2 hover:bg-blue-700"
-      title="Spieler aus CSV importieren"
+      title="Spieler aus CSV/Excel importieren (Meldeliste)"
     >
-      <Database size={14} className="md:w-4 md:h-4"/> <span className="hidden sm:inline">Import CSV</span><span className="sm:hidden">Import</span>
+      <Database size={14} className="md:w-4 md:h-4"/> <span className="hidden sm:inline">Import Meldeliste</span><span className="sm:hidden">Import</span>
     </button>
 
     <button onClick={() => setIsCreatingTeam(!isCreatingTeam)} className="bg-purple-600 text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2 hover:bg-purple-700">
