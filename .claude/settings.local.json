@@ -4,7 +4,10 @@
       "Bash(npm run build:*)",
       "Bash(npx tsc:*)",
       "Bash(git checkout:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nImprove: comprehensive mobile responsiveness for Spielplan/Planner tab\n\n- Reduce container padding on mobile (p-6 → p-4 md:p-6)\n- Optimize table min-width for mobile (500px → 400px)\n- Make level header section stack vertically on mobile\n- Add flex-wrap to text and button groups for better overflow handling\n- Improve fixture cards layout with responsive player names\n- Stack scoring mode selector and save button on mobile\n- Enlarge pagination buttons for better touch targets\n- Fix template string syntax bug in \"Auslosung\" section\n- Add responsive sizing to weight editing controls\n- Optimize all spacing, padding, and text sizes for mobile screens\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
