@@ -1830,8 +1830,8 @@ const collectPlannerStats = useMemo(() => {
         if (m.roundId) roundIds.add(m.roundId);
       });
       const basePoints = wins * 2 + close * 1;
-      const participationPoints = roundIds.size; // 1 Punkt pro Spieltag
-      const points = parseFloat(((basePoints + participationPoints) * weight).toFixed(1));
+      const participationPoints = roundIds.size; // 1 Punkt pro Spieltag (ungewichtet)
+      const points = parseFloat((basePoints * weight + participationPoints).toFixed(1));
       return { player: p, wins, losses, close, points, weight, participationPoints };
     });
     
