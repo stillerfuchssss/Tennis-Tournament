@@ -930,9 +930,15 @@ const TennisManager = () => {
 
 // --- STATE ---
 
-const [isAdmin, setIsAdmin] = useState(false);
+const [isAdmin, setIsAdmin] = useState(() => {
+  const saved = localStorage.getItem('isAdmin');
+  return saved ? JSON.parse(saved) : false;
+});
 
-const [currentUser, setCurrentUser] = useState<string>('');
+const [currentUser, setCurrentUser] = useState<string>(() => {
+  const saved = localStorage.getItem('currentUser');
+  return saved ? JSON.parse(saved) : '';
+});
 
 
 // Login Inputs
@@ -1125,7 +1131,10 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   const [editingWeightGroup, setEditingWeightGroup] = useState<string | null>(null);
   const [editingWeightValue, setEditingWeightValue] = useState('');
   const [plannerCurrentPage, setPlannerCurrentPage] = useState(1);
-  const [showTournamentField, setShowTournamentField] = useState(true);
+  const [showTournamentField, setShowTournamentField] = useState(() => {
+    const saved = localStorage.getItem('showTournamentField');
+    return saved ? JSON.parse(saved) : true;
+  });
   const [enableTournamentMenu, setEnableTournamentMenu] = useState(true);
   const [editingFixtures, setEditingFixtures] = useState<Record<string, boolean>>({});
 
@@ -1164,6 +1173,21 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
       htmlElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Session Persistence - Admin State
+  useEffect(() => {
+    localStorage.setItem('isAdmin', JSON.stringify(isAdmin));
+  }, [isAdmin]);
+
+  // Session Persistence - Current User
+  useEffect(() => {
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  // Tournament Field Setting Persistence
+  useEffect(() => {
+    localStorage.setItem('showTournamentField', JSON.stringify(showTournamentField));
+  }, [showTournamentField]);
 
 
 // Generator Config
@@ -4490,7 +4514,6 @@ Tennis Turnier Manager
 
 {isAdmin ? <><ShieldCheck size={10} className="md:w-3 md:h-3 text-emerald-400"/> Admin: {currentUser}</> : 'ðŸ‘ï¸ Zuschauer Modus'}
 
-<span className="bg-white/20 px-1.5 md:px-2 py-0.5 rounded ml-1 md:ml-2 flex items-center gap-1"><HardDrive size={8} className="md:w-[10px] md:h-[10px]"/> <span className="hidden sm:inline">Local Storage</span></span>
 
 </p>
 
