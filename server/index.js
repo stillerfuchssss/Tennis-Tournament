@@ -1,10 +1,10 @@
 // server/index.js
-console.log('=== START: index.js wird ausgeführt ==='); // <-- NEUE START-LOG-ZEILE
+console.log('=== START: index.js wird ausgeführt ===');
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const db = require('./database'); // <--- CRASH-PUNKT?
+const { db, initDB } = require('./database'); // Turso DB
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -14,31 +14,29 @@ app.use(express.json({ limit: '50mb' }));
 // --- API ENDPUNKTE ---
 
 // Daten laden (ersetzt localStorage.getItem)
-app.get('/api/storage/:key', (req, res) => {
+app.get('/api/storage/:key', async (req, res) => {
     const key = req.params.key;
-    db.get("SELECT value FROM storage WHERE key = ?", [key], (err, row) => {
-        if (err) {
-            console.error("Datenbank Fehler beim Laden:", err.message);
-            res.status(500).json({ error: err.message });
-            return;
-        }
+    try {
+        const row = await db.get("SELECT value FROM storage WHERE key = ?", [key]);
         res.json(row ? JSON.parse(row.value) : null);
-    });
+    } catch (err) {
+        console.error("Datenbank Fehler beim Laden:", err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // Daten speichern (ersetzt localStorage.setItem)
-app.post('/api/storage', (req, res) => {
+app.post('/api/storage', async (req, res) => {
     const { key, value } = req.body;
     const jsonValue = JSON.stringify(value);
 
-    db.run(`INSERT OR REPLACE INTO storage (key, value) VALUES (?, ?)`, [key, jsonValue], function(err) {
-        if (err) {
-            console.error("Datenbank Fehler beim Speichern:", err.message);
-            res.status(500).json({ error: err.message });
-            return;
-        }
+    try {
+        await db.run(`INSERT OR REPLACE INTO storage (key, value) VALUES (?, ?)`, [key, jsonValue]);
         res.json({ success: true });
-    });
+    } catch (err) {
+        console.error("Datenbank Fehler beim Speichern:", err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- FRONTEND AUSLIEFERN ---
@@ -49,7 +47,12 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-// SERVER START
-app.listen(PORT, () => {
-    console.log(`Server läuft erfolgreich auf Port ${PORT}`); // <-- Dies sollte erscheinen!
-});
+// SERVER START - erst nach DB-Init
+const startServer = async () => {
+    await initDB(); // Warte auf Turso-Verbindung
+    app.listen(PORT, () => {
+        console.log(`🚀 Server läuft auf Port ${PORT} mit Turso Cloud DB`);
+    });
+};
+
+startServer();
