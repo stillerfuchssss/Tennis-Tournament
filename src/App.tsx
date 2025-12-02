@@ -1502,24 +1502,23 @@ if (ageGroup && level) {
   if (participantCount > maxGroupSize) maxGroupSize = participantCount;
 }
 
-// Faire Gewichtungsberechnung:
-// Kleinere Gruppen erhalten HÖHERE Gewichtung (weniger Spiele = mehr Punkte pro Spiel)
+// Faire Gewichtungsberechnung mit Dämpfungsfaktor:
+// Kleinere Gruppen erhalten leicht HÖHERE Gewichtung (weniger Spiele = etwas mehr Punkte pro Spiel)
 // Größte Gruppe erhält Gewichtung 1.0 (Minimum)
-// Maximale Gewichtung: 1.25 (25% Bonus)
+// Dämpfungsfaktor 0.2 (20%) macht die Unterschiede sehr klein und fair
 //
-// Formel: 1.0 + min((maxGroupSize / participantCount - 1.0) * 0.5, 0.25)
+// Formel: 1.0 + (sqrt(maxGroupSize) / sqrt(participantCount) - 1.0) * 0.2
 //
-// Beispiele bei maxGroupSize = 10:
-// - Gruppe mit 10 Spielern: 1.00 (Basisgewichtung, größte Gruppe)
-// - Gruppe mit  8 Spielern: 1.00 + (0.25 * 0.5) = 1.125 (12.5% höher)
-// - Gruppe mit  6 Spielern: 1.00 + (0.67 * 0.5) = 1.33 → 1.25 (gekappt bei 25%)
-// - Gruppe mit  4 Spielern: 1.00 + (1.5 * 0.5) = 1.75 → 1.25 (gekappt bei 25%)
-const ratio = maxGroupSize / participantCount;
-const boost = Math.min((ratio - 1.0) * 0.5, 0.25); // 50% vom Unterschied, max 25% Bonus
-const weight = 1.0 + boost;
+// Beispiel bei maxGroupSize = 10:
+// - Gruppe mit 10 Spielern: 1.00 (Basisgewichtung)
+// - Gruppe mit 5 Spielern:  1.00 + (1.41 - 1.00) * 0.2 = 1.08 (nur 8% höher)
+// - Gruppe mit 3 Spielern:  1.00 + (1.83 - 1.00) * 0.2 = 1.17 (nur 17% höher)
+const baseWeight = Math.sqrt(maxGroupSize) / Math.sqrt(participantCount);
+const dampingFactor = 0.2; // Nur 20% des Unterschieds wird berücksichtigt
+const weight = 1.0 + (baseWeight - 1.0) * dampingFactor;
 
-// Stelle sicher, dass die Gewichtung zwischen 1.0 und 1.25 liegt
-return parseFloat(Math.max(1.0, Math.min(1.25, weight)).toFixed(2));
+// Stelle sicher, dass die Gewichtung mindestens 1.0 ist
+return parseFloat(Math.max(1.0, weight).toFixed(2));
 
 };
 
@@ -4717,7 +4716,7 @@ className={`px-2 md:px-4 py-1 md:py-1.5 text-[10px] md:text-xs border rounded-lg
 
 <li><b>Teilnahme:</b> 1 Punkt (ohne Gewichtung)</li>
 
-<li><b>Gruppengewicht:</b> Basis ist die größte Gruppe gleicher Alters- & Leistungsklasse. Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.25), große Gruppen werden nicht bestraft (min 1.0).</li>
+<li><b>Gruppengewicht:</b> Basis ist die groesste Gruppe gleicher Alters- & Leistungsklasse. Kleinere Gruppen bekommen mehr Punkte (bis Faktor 1.5), grosse Gruppen werden nicht bestraft (min 1.0).</li>
 <li><b>Zählweisen:</b> Race-4 (knapp bei 4:3), Race-10 (knapp bei 10:9), Race-15 (knapp bis max. 2-3 Punkte Differenz ab 15).</li>
 
 </ul>
