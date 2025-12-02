@@ -1704,10 +1704,6 @@ const deletePlannerResult = (fixture: PlannedMatch) => {
 
 const savePlannerResult = (fixture: PlannedMatch) => {
   if (!isAdmin) return;
-  if (!plannerSelectedTournamentId || !plannerSelectedRoundId) {
-    addToast('Bitte wähle zuerst ein Turnier und einen Spieltag aus', 'error');
-    return;
-  }
   const scoreStr = (plannerScoreInput[fixture.id] || '').trim();
   if (!scoreStr) { addToast('Bitte Spielstand eintragen', 'error'); return; }
   const p1 = players.find(p => p.id === fixture.p1Id);
@@ -1716,7 +1712,8 @@ const savePlannerResult = (fixture: PlannedMatch) => {
   const mode = plannerScoringMode;
   const res1 = analyzeSingleScore(scoreStr, mode);
   const res2 = analyzeSingleScore(reverseScoreString(scoreStr), mode);
-  const tournamentId = plannerSelectedTournamentId;
+  // Verwende ausgewähltes Turnier oder "planner-default"
+  const tournamentId = plannerSelectedTournamentId || 'planner-default';
   let updatedResults = [...results];
   const addMatch = (playerId: string, opponentId: string, opponentName: string, res: {isWin:boolean; isCloseLoss:boolean}) => {
     const matchId = generateId();
