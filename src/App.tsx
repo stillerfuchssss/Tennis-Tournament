@@ -1426,6 +1426,11 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   const [plannerSelectedTournamentId, setPlannerSelectedTournamentId] = useState<string>('');
   const [plannerSelectedRoundId, setPlannerSelectedRoundId] = useState<string>('');
   const [groupMatchModes, setGroupMatchModes] = useState<Record<string, 'auto' | 'single' | 'double'>>({});
+  
+  // Ausgeschlossene Spieler pro Turniertag (werden bei Auslosung nicht berücksichtigt)
+  // Format: { "roundId-ageGroup-level": ["playerId1", "playerId2"] }
+  const [excludedPlayers, setExcludedPlayers] = useState<Record<string, string[]>>({});
+  const [showExcludedPlayersModal, setShowExcludedPlayersModal] = useState(false);
 
   // Synchronisiere Target-Altersgruppe mit plannerAgeGroup
   useEffect(() => {
@@ -1976,10 +1981,101 @@ const collectPlannerStats = useMemo(() => {
   };
 }, [players, results, customGroupWeights]);
 
+// Helper: Hole die ausgeschlossenen Spieler für eine Gruppe
+const getExcludedPlayerIds = (roundId: string, ageGroup: AgeGroup, level: Level): string[] => {
+  const key = `${roundId}-${ageGroup}-${level}`;
+  return excludedPlayers[key] || [];
+};
+
+// Spieler aus Gruppe ausschließen (wird nicht mehr bei Auslosung berücksichtigt)
+const excludePlayerFromGroup = (playerId: string, ageGroup: AgeGroup, level: Level) => {
+  if (!plannerSelectedRoundId) {
+    addToast('Bitte zuerst einen Turniertag auswählen', 'error');
+    return;
+  }
+  
+  const key = `${plannerSelectedRoundId}-${ageGroup}-${level}`;
+  const current = excludedPlayers[key] || [];
+  
+  if (!current.includes(playerId)) {
+    setExcludedPlayers(prev => ({
+      ...prev,
+      [key]: [...current, playerId]
+    }));
+    
+    const player = players.find(p => p.id === playerId);
+    addToast(`${player?.name || 'Spieler'} aus Gruppe entfernt`, 'info');
+  }
+};
+
+// Spieler wieder zur Gruppe hinzufügen
+const includePlayerInGroup = (playerId: string, ageGroup: AgeGroup, level: Level, roundId?: string) => {
+  const targetRound = roundId || plannerSelectedRoundId;
+  if (!targetRound) return;
+  
+  const key = `${targetRound}-${ageGroup}-${level}`;
+  const current = excludedPlayers[key] || [];
+  
+  setExcludedPlayers(prev => ({
+    ...prev,
+    [key]: current.filter(id => id !== playerId)
+  }));
+  
+  const player = players.find(p => p.id === playerId);
+  addToast(`${player?.name || 'Spieler'} wieder zur Gruppe hinzugefügt`, 'success');
+};
+
+// Hole alle Spieler ohne Gruppe für den aktuellen Turniertag
+const getPlayersWithoutGroup = useMemo(() => {
+  if (!plannerSelectedRoundId) return [];
+  
+  // Sammle alle Spieler, die aktuell in einer Gruppe sind (in plannerFixtures)
+  const playersInGroups = new Set<string>();
+  Object.values(plannerFixtures).forEach(fixtures => {
+    fixtures.forEach(f => {
+      if (f.p1Id) playersInGroups.add(f.p1Id);
+      if (f.p2Id) playersInGroups.add(f.p2Id);
+    });
+  });
+  
+  // Sammle alle Spieler die bereits Ergebnisse für diesen Turniertag haben
+  results.forEach(r => {
+    r.matches.forEach(m => {
+      if (m.roundId?.includes(plannerSelectedRoundId)) {
+        playersInGroups.add(r.playerId);
+      }
+    });
+  });
+  
+  // Finde alle Spieler die NICHT in einer Gruppe sind
+  return players.filter(p => {
+    // Prüfe ob Spieler in einer Gruppe ist
+    if (playersInGroups.has(p.id)) return false;
+    
+    // Prüfe ob Spieler ausgeschlossen wurde
+    const ageGroup = calculateAgeGroup(p);
+    const level = p.level || 'C';
+    const excludedKey = `${plannerSelectedRoundId}-${ageGroup}-${level}`;
+    const isExcluded = (excludedPlayers[excludedKey] || []).includes(p.id);
+    
+    return isExcluded; // Nur ausgeschlossene Spieler anzeigen
+  });
+}, [players, plannerFixtures, results, plannerSelectedRoundId, excludedPlayers]);
+
 const generatePlannerForAgeGroup = (age: AgeGroup) => {
   const newMap = { ...plannerFixtures };
   (['A','B','C'] as Level[]).forEach(level => {
-    const eligible = players.filter(p => calculateAgeGroup(p) === age && p.level === level);
+    // Berücksichtige ausgeschlossene Spieler
+    const excludedIds = plannerSelectedRoundId 
+      ? getExcludedPlayerIds(plannerSelectedRoundId, age, level)
+      : [];
+    
+    const eligible = players.filter(p => 
+      calculateAgeGroup(p) === age && 
+      p.level === level &&
+      !excludedIds.includes(p.id) // Ausgeschlossene Spieler nicht berücksichtigen
+    );
+    
     const groupKey = `${age}-${level}`;
     const currentMode = groupMatchModes[groupKey] || 'auto';
     const mode: 'single' | 'double' = currentMode === 'auto'
@@ -3933,7 +4029,9 @@ if (!r) return false;
 
 return r.matches.some(m => {
 
-const inScope = roundScope === 'all' ? true : roundScope === null ? !m.roundId : m.roundId === roundScope;
+const matchesRoundScope = roundScope ? (m.roundId === roundScope || m.roundId === `planner-${roundScope}`) : false;
+
+const inScope = roundScope === 'all' ? true : roundScope === null ? !m.roundId : matchesRoundScope;
 
 const matchLevel = getMatchLevel(m, p.level || null);
 
@@ -3967,7 +4065,7 @@ let participationCount = 0;
 
 tourn.rounds.forEach(round => {
 
-const matchesInRound = res.matches.filter(m => m.roundId === round.id);
+const matchesInRound = res.matches.filter(m => m.roundId === round.id || m.roundId === `planner-${round.id}`);
 
 if (matchesInRound.length === 0) return;
 
@@ -4072,7 +4170,7 @@ weight: tournWeight.toFixed(2)
 // Scope: Einzelner Spieltag oder Turnier ohne Runden
 
 const matchesInScope = res.matches.filter(m =>
-rankingRoundScope === 'all' || m.roundId === rankingRoundScope
+rankingRoundScope === 'all' || m.roundId === rankingRoundScope || m.roundId === `planner-${rankingRoundScope}`
 );
 
 if (matchesInScope.length === 0) {
@@ -4082,7 +4180,7 @@ return; // Keine Matches im Scope -> weiter zum nächsten Turnier
 const requiresWinForScope = rankingScope !== 'overall';
 const hasRelevantWin = rankingRoundScope === 'all'
   ? matchesInScope.some(m => m.isWin)
-  : matchesInScope.some(m => m.isWin && m.roundId === rankingRoundScope);
+  : matchesInScope.some(m => m.isWin && (m.roundId === rankingRoundScope || m.roundId === `planner-${rankingRoundScope}`));
 
 if (requiresWinForScope && !hasRelevantWin) {
   return; // Nur Spieler mit Siegen für diese Auswahl anzeigen
@@ -4248,6 +4346,224 @@ return players
 }, [players, playersListSearch, playersListAgeFilter]);
 
 
+
+// --- EXCLUDED PLAYERS MODAL ---
+const ExcludedPlayersModal = () => {
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [targetRoundId, setTargetRoundId] = useState<string>(plannerSelectedRoundId || '');
+  
+  if (!showExcludedPlayersModal) return null;
+  
+  const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
+  const selectedRound = selectedTournament?.rounds.find(r => r.id === plannerSelectedRoundId);
+  const allRounds = selectedTournament?.rounds || [];
+  
+  // Sammle ALLE ausgeschlossenen Spieler (über alle Altersgruppen und Levels)
+  const allExcludedPlayers: { player: Player, originalAgeGroup: AgeGroup, originalLevel: Level }[] = [];
+  
+  if (plannerSelectedRoundId) {
+    AGE_GROUP_ORDER.forEach(ageGroup => {
+      (['A', 'B', 'C'] as Level[]).forEach(level => {
+        const key = `${plannerSelectedRoundId}-${ageGroup}-${level}`;
+        const excludedIds = excludedPlayers[key] || [];
+        excludedIds.forEach(id => {
+          const player = players.find(p => p.id === id);
+          if (player && !allExcludedPlayers.some(e => e.player.id === id)) {
+            allExcludedPlayers.push({ player, originalAgeGroup: ageGroup, originalLevel: level });
+          }
+        });
+      });
+    });
+  }
+  
+  // Sortiere nach Name
+  allExcludedPlayers.sort((a, b) => a.player.name.localeCompare(b.player.name));
+  
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowExcludedPlayersModal(false)}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col ${darkMode ? 'bg-slate-900' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`p-4 md:p-6 border-b flex justify-between items-center ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+          <div>
+            <h2 className={`text-lg md:text-xl font-bold flex items-center gap-2 ${darkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+              <Users className="text-amber-500" size={20}/>
+              Spieler ohne Gruppe
+            </h2>
+            <p className={`text-xs md:text-sm mt-1 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              {selectedRound?.name || 'Kein Spieltag'} - {selectedRound?.date || ''}
+            </p>
+          </div>
+          <button onClick={() => setShowExcludedPlayersModal(false)} className={`p-2 rounded-lg transition ${darkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-100'}`}>
+            <X size={20} className={darkMode ? 'text-slate-400' : 'text-slate-600'}/>
+          </button>
+        </div>
+        
+        {/* Spieltag-Auswahl für das Hinzufügen */}
+        <div className={`px-4 md:px-6 py-3 border-b ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+          <label className={`text-xs font-medium block mb-1.5 ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+            Ziel-Spieltag beim Hinzufügen:
+          </label>
+          <select
+            value={targetRoundId}
+            onChange={(e) => setTargetRoundId(e.target.value)}
+            className={`w-full px-3 py-2 rounded-lg text-sm font-medium border transition ${
+              darkMode 
+                ? 'bg-slate-700 border-slate-600 text-slate-200' 
+                : 'bg-white border-slate-300 text-slate-800'
+            }`}
+          >
+            {allRounds.map(round => (
+              <option key={round.id} value={round.id}>
+                {round.name} - {round.date} {round.id === plannerSelectedRoundId ? '(aktuell)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3">
+          {allExcludedPlayers.length === 0 ? (
+            <div className={`text-center py-8 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              <Users size={48} className="mx-auto mb-3 opacity-30"/>
+              <p className="font-medium">Alle Spieler sind in einer Gruppe</p>
+              <p className="text-xs mt-1">Keine ausgeschlossenen Spieler für diesen Spieltag</p>
+            </div>
+          ) : (
+            allExcludedPlayers.map(({ player, originalAgeGroup, originalLevel }) => {
+              const isExpanded = expandedPlayerId === player.id;
+              const playerAgeGroup = calculateAgeGroup(player);
+              
+              return (
+                <div key={player.id} className={`border rounded-xl overflow-hidden transition-all ${darkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  {/* Header - immer sichtbar */}
+                  <div 
+                    className={`flex items-center justify-between p-3 cursor-pointer transition ${darkMode ? 'hover:bg-slate-750' : 'hover:bg-slate-100'}`}
+                    onClick={() => setExpandedPlayerId(isExpanded ? null : player.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <span className={`font-semibold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{player.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-xs ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {displayAgeGroup(playerAgeGroup)}
+                          </span>
+                          {renderLevelBadge(player.level, 'sm')}
+                          {player.club && <span className={`text-xs ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>• {player.club}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ChevronRight size={18} className={`transition-transform ${isExpanded ? 'rotate-90' : ''} ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}/>
+                    </div>
+                  </div>
+                  
+                  {/* Erweiterte Optionen */}
+                  {isExpanded && (
+                    <div className={`p-4 border-t ${darkMode ? 'border-slate-700 bg-slate-850' : 'border-slate-200 bg-white'}`}>
+                      <p className={`text-xs mb-3 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Wähle aus, in welche Gruppe der Spieler hinzugefügt werden soll:
+                      </p>
+                      
+                      {/* Altersgruppen-Auswahl */}
+                      <div className="space-y-3">
+                        {AGE_GROUP_ORDER.filter(ag => AGE_RANK[playerAgeGroup] <= AGE_RANK[ag]).map(ageGroup => (
+                          <div key={ageGroup} className={`border rounded-lg p-3 ${darkMode ? 'border-slate-600 bg-slate-800' : 'border-slate-200 bg-slate-50'}`}>
+                            <div className={`text-sm font-semibold mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                              {displayAgeGroup(ageGroup)}
+                              {ageGroup === playerAgeGroup && <span className="text-xs ml-2 text-emerald-500">(Standard)</span>}
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2">
+                              {(['A', 'B', 'C'] as Level[]).map(level => {
+                                const isPlayerLevel = level === player.level;
+                                const targetRound = allRounds.find(r => r.id === targetRoundId);
+                                
+                                return (
+                                  <button
+                                    key={level}
+                                    onClick={() => {
+                                      // Entferne aus alter Position (vom aktuellen Spieltag)
+                                      const oldKey = `${plannerSelectedRoundId}-${originalAgeGroup}-${originalLevel}`;
+                                      setExcludedPlayers(prev => ({
+                                        ...prev,
+                                        [oldKey]: (prev[oldKey] || []).filter(id => id !== player.id)
+                                      }));
+                                      
+                                      // Aktualisiere Spieler-Level falls nötig
+                                      if (player.level !== level) {
+                                        const updatedPlayers = players.map(p =>
+                                          p.id === player.id ? { ...p, level } : p
+                                        );
+                                        updatePlayers(updatedPlayers);
+                                      }
+                                      
+                                      // Füge zur neuen Gruppe hinzu
+                                      const targetRoundName = targetRound?.name || 'Spieltag';
+                                      addToast(`${player.name} zu ${displayAgeGroup(ageGroup)} ${LEVEL_LABELS[level]} (${targetRoundName}) hinzugefügt`, 'success');
+                                      setExpandedPlayerId(null);
+                                    }}
+                                    className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                                      isPlayerLevel 
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                        : darkMode 
+                                          ? 'bg-slate-700 hover:bg-slate-600 text-slate-200' 
+                                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
+                                    }`}
+                                  >
+                                    {renderLevelBadge(level, 'sm')}
+                                    {isPlayerLevel && <span className="text-[10px]">✓</span>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Schnell-Aktion: Zurück zur Original-Gruppe */}
+                      <button
+                        onClick={() => {
+                          includePlayerInGroup(player.id, originalAgeGroup, originalLevel, targetRoundId);
+                          setExpandedPlayerId(null);
+                        }}
+                        className="w-full mt-3 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition"
+                      >
+                        <ArrowRightCircle size={14}/> Zurück zu {displayAgeGroup(originalAgeGroup)} {LEVEL_LABELS[originalLevel]}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+        
+        <div className={`p-4 border-t ${darkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+          <div className="flex gap-2">
+            {allExcludedPlayers.length > 0 && (
+              <button
+                onClick={() => {
+                  // Alle Spieler zurück zu ihren Original-Gruppen zum Ziel-Spieltag
+                  allExcludedPlayers.forEach(({ player, originalAgeGroup, originalLevel }) => {
+                    includePlayerInGroup(player.id, originalAgeGroup, originalLevel, targetRoundId);
+                  });
+                  setShowExcludedPlayersModal(false);
+                }}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition flex items-center justify-center gap-2"
+              >
+                <PlusCircle size={16}/> Alle hinzufügen
+              </button>
+            )}
+            <button
+              onClick={() => setShowExcludedPlayersModal(false)}
+              className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition ${darkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'}`}
+            >
+              Schließen
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // --- PLAYER MODAL ---
 
@@ -4830,6 +5146,8 @@ return (
 <div className={`min-h-screen font-sans transition-colors duration-300 p-2 md:p-6 pb-24 md:pb-6 relative overflow-x-hidden ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
 
 <PlayerDetailModal />
+
+<ExcludedPlayersModal />
 
 <ConfirmModal />
 
@@ -5790,6 +6108,19 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       <Shuffle size={16} className="md:w-[18px] md:h-[18px]"/> Alle Leistungsklassen auslosen
     </button>
 
+    {/* Button für Spieler ohne Gruppe */}
+    <button 
+      onClick={() => setShowExcludedPlayersModal(true)} 
+      className={`w-full px-3 md:px-4 py-2.5 md:py-3 text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all ${
+        getPlayersWithoutGroup.length > 0 
+          ? 'bg-amber-500 hover:bg-amber-600 text-white' 
+          : 'bg-slate-200 hover:bg-slate-300 text-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300'
+      }`}
+    >
+      <Users size={16} className="md:w-[18px] md:h-[18px]"/> 
+      Spieler ohne Gruppe {getPlayersWithoutGroup.length > 0 && `(${getPlayersWithoutGroup.length})`}
+    </button>
+
     <button
       onClick={() => {
         const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
@@ -6109,7 +6440,18 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 const mode: 'single' | 'double' = currentMode === 'auto'
                   ? (participantCount <= 4 ? 'double' : 'single')
                   : currentMode;
-                const eligible = players.filter(p => calculateAgeGroup(p) === plannerAgeGroup && p.level === level);
+                
+                // Berücksichtige ausgeschlossene Spieler
+                const excludedIds = plannerSelectedRoundId 
+                  ? getExcludedPlayerIds(plannerSelectedRoundId, plannerAgeGroup, level)
+                  : [];
+                
+                const eligible = players.filter(p => 
+                  calculateAgeGroup(p) === plannerAgeGroup && 
+                  p.level === level &&
+                  !excludedIds.includes(p.id)
+                );
+                
                 const newFixtures = generateRoundRobin(eligible.map(p => p.id), mode).map(f => ({
                   id: generateId(),
                   ageGroup: plannerAgeGroup,
@@ -6131,28 +6473,45 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                   isOpen: true,
                   message: `Gesamte Gruppe ${LEVEL_LABELS[level]} (${displayAgeGroup(plannerAgeGroup)}) löschen? Alle Fixtures und Punkte werden gelöscht.`,
                   onConfirm: () => {
-                    // Sammle alle Fixtures dieser Gruppe
+                    // Sammle alle Spieler-IDs aus stats (enthält alle Spieler mit Punkten, auch ohne Fixtures)
+                    const playerIdsFromStats = new Set(stats.map(s => s.player.id));
+                    
+                    // Sammle auch Spieler-IDs aus Fixtures (falls vorhanden)
                     const groupFixtures = fixtures;
-
-                    // Sammle alle Spieler-IDs
-                    const playerIds = new Set<string>();
                     groupFixtures.forEach(f => {
-                      playerIds.add(f.p1Id);
-                      playerIds.add(f.p2Id);
+                      playerIdsFromStats.add(f.p1Id);
+                      playerIdsFromStats.add(f.p2Id);
                     });
 
                     // Entferne alle gespeicherten Ergebnisse für diese Gruppe
+                    // Basierend auf: Spieler-ID, Level, und roundId (planner oder normal)
                     const updatedResults = results.map(playerResult => {
+                      // Nur Ergebnisse für Spieler in dieser Gruppe bearbeiten
+                      if (!playerIdsFromStats.has(playerResult.playerId)) return playerResult;
+                      
                       return {
                         ...playerResult,
                         matches: playerResult.matches.filter(m => {
-                          // Behalte nur matches, die nicht zu den gelöschten Fixtures gehören
-                          const belongsToDeletedFixture = groupFixtures.some(f =>
-                            m.roundId === `planner-${f.round}` &&
+                          // Prüfe ob dieses Match zu dieser Gruppe gehört
+                          const player = players.find(p => p.id === playerResult.playerId);
+                          const matchLevel = getMatchLevel(m, player?.level || null);
+                          
+                          // Nur Matches für dieses Level löschen
+                          if (matchLevel !== level) return true; // Behalten
+                          
+                          // Prüfe ob es ein Planner-Match für den aktuellen Spieltag ist
+                          const isPlannerMatch = m.roundId?.startsWith('planner-') && 
+                            m.roundId.includes(plannerSelectedRoundId);
+                          
+                          // Oder ein Match das zu einem Fixture in dieser Gruppe gehört
+                          const belongsToFixture = groupFixtures.some(f =>
+                            (m.roundId === `planner-${f.round}` || m.roundId === `planner-${plannerSelectedRoundId}`) &&
                             ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
                              (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
                           );
-                          return !belongsToDeletedFixture;
+                          
+                          // Lösche wenn es ein Planner-Match ist oder zu einem Fixture gehört
+                          return !(isPlannerMatch || belongsToFixture);
                         })
                       };
                     });
@@ -6242,13 +6601,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                         onClick={() => {
                           setConfirmDialog({
                             isOpen: true,
-                            message: `${s.player.name} komplett aus ${LEVEL_LABELS[level]} entfernen? Alle Fixtures und Punkte werden gelöscht.`,
+                            message: `${s.player.name} aus ${LEVEL_LABELS[level]} entfernen? Alle Punkte dieses Spielers in dieser Gruppe werden gelöscht.`,
                             onConfirm: () => {
-                              // Sammle alle Fixtures dieses Spielers in dieser Gruppe
-                              const playerFixtures = (plannerFixtures[key] || []).filter(
-                                f => f.p1Id === s.player.id || f.p2Id === s.player.id
-                              );
-
                               // Entferne alle Fixtures, die diesen Spieler betreffen
                               const updatedFixtures = (plannerFixtures[key] || []).filter(
                                 f => f.p1Id !== s.player.id && f.p2Id !== s.player.id
@@ -6256,30 +6610,48 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                               const newPlannerFixtures = { ...plannerFixtures, [key]: updatedFixtures };
                               updatePlannerFixtures(newPlannerFixtures);
 
-                              // Entferne alle gespeicherten Ergebnisse für diese Fixtures
+                              // Entferne ALLE Ergebnisse für diesen Spieler in diesem Level
+                              // (auch wenn keine Fixtures mehr vorhanden sind)
                               const updatedResults = results.map(playerResult => {
+                                // Für den zu löschenden Spieler: alle Matches in diesem Level löschen
+                                if (playerResult.playerId === s.player.id) {
+                                  return {
+                                    ...playerResult,
+                                    matches: playerResult.matches.filter(m => {
+                                      const matchLevel = getMatchLevel(m, s.player.level || null);
+                                      // Behalte nur Matches die NICHT zu diesem Level gehören
+                                      // und auch nicht zu Planner-Matches für diesen Spieltag
+                                      const isPlannerMatch = m.roundId?.includes(plannerSelectedRoundId);
+                                      return matchLevel !== level || !isPlannerMatch;
+                                    })
+                                  };
+                                }
+                                
+                                // Für andere Spieler: Matches gegen diesen Spieler löschen
                                 return {
                                   ...playerResult,
                                   matches: playerResult.matches.filter(m => {
-                                    // Behalte nur matches, die nicht zu den gelöschten Fixtures gehören
-                                    const belongsToDeletedFixture = playerFixtures.some(f =>
-                                      m.roundId === `planner-${f.round}` &&
-                                      ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
-                                       (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
-                                    );
-                                    return !belongsToDeletedFixture;
+                                    // Wenn Gegner der zu löschende Spieler ist und es ein Planner-Match ist
+                                    if (m.opponentId === s.player.id && m.roundId?.includes(plannerSelectedRoundId)) {
+                                      const matchLevel = getMatchLevel(m, players.find(p => p.id === playerResult.playerId)?.level || null);
+                                      return matchLevel !== level; // Löschen wenn gleiches Level
+                                    }
+                                    return true;
                                   })
                                 };
                               });
                               updateResults(updatedResults);
 
-                              addToast(`${s.player.name} komplett aus Gruppe entfernt`, 'success');
+                              // Spieler zu ausgeschlossenen hinzufügen
+                              excludePlayerFromGroup(s.player.id, plannerAgeGroup, level);
+
+                              addToast(`${s.player.name} aus Gruppe entfernt`, 'success');
                               closeConfirm();
                             }
                           });
                         }}
                         className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                        title="Spieler und alle Punkte entfernen"
+                        title="Spieler entfernen (wird bei Auslosung nicht mehr berücksichtigt)"
                       >
                         <Trash2 size={16} className="text-red-600 dark:text-red-400" />
                       </button>
@@ -6311,11 +6683,27 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                           onClick={() => {
                             setConfirmDialog({
                               isOpen: true,
-                              message: `Dieses Fixture (Runde ${f.round}) wirklich löschen?`,
+                              message: `Dieses Fixture (Runde ${f.round}) wirklich löschen? Falls bereits Punkte eingetragen wurden, werden diese ebenfalls gelöscht.`,
                               onConfirm: () => {
                                 // Entferne das Fixture
                                 const updatedFixtures = (plannerFixtures[key] || []).filter(fix => fix.id !== f.id);
                                 setPlannerFixtures(prev => ({ ...prev, [key]: updatedFixtures }));
+                                
+                                // Entferne auch die gespeicherten Ergebnisse für dieses Fixture
+                                const updatedResults = results.map(playerResult => {
+                                  return {
+                                    ...playerResult,
+                                    matches: playerResult.matches.filter(m => {
+                                      const belongsToThisFixture = 
+                                        (m.roundId === `planner-${f.round}` || m.roundId === `planner-${plannerSelectedRoundId}`) &&
+                                        ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
+                                         (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id));
+                                      return !belongsToThisFixture;
+                                    })
+                                  };
+                                });
+                                updateResults(updatedResults);
+                                
                                 addToast('Fixture gelöscht', 'success');
                                 closeConfirm();
                               }
