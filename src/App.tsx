@@ -172,6 +172,22 @@ memberIds?: string[];
 };
 
 
+type AdminPermissions = {
+  canManagePlayers: boolean;      // Spieler erstellen/bearbeiten/löschen
+  canManageTournaments: boolean;  // Turniere erstellen/bearbeiten/löschen
+  canEnterResults: boolean;       // Ergebnisse eingeben
+  canManagePlanner: boolean;      // Spielplan verwalten (Auslosung, Gruppen)
+  canExportData: boolean;         // Daten exportieren (Excel, Backup)
+};
+
+const DEFAULT_PERMISSIONS: AdminPermissions = {
+  canManagePlayers: true,
+  canManageTournaments: true,
+  canEnterResults: true,
+  canManagePlanner: true,
+  canExportData: true,
+};
+
 type AdminAccount = {
 
 id: string;
@@ -181,6 +197,8 @@ username: string;
 password: string;
 
 isSuperAdmin?: boolean;
+
+permissions?: AdminPermissions;
 
 };
 
@@ -1224,6 +1242,11 @@ const [currentUser, setCurrentUser] = useState<string>(() => {
   return saved ? JSON.parse(saved) : '';
 });
 
+const [currentAdminId, setCurrentAdminId] = useState<string>(() => {
+  const saved = localStorage.getItem('currentAdminId');
+  return saved ? JSON.parse(saved) : '';
+});
+
 
 // Login Inputs
 
@@ -1472,6 +1495,33 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
   useEffect(() => {
     localStorage.setItem('currentUser', JSON.stringify(currentUser));
   }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('currentAdminId', JSON.stringify(currentAdminId));
+  }, [currentAdminId]);
+
+  // Helper: Hole aktuellen Admin und dessen Berechtigungen
+  const currentAdmin = useMemo(() => {
+    if (!currentAdminId || !isAdmin) return null;
+    return admins.find(a => a.id === currentAdminId) || null;
+  }, [currentAdminId, isAdmin, admins]);
+
+  const isSuperAdmin = currentAdmin?.isSuperAdmin ?? false;
+
+  // Berechtigungsprüfung - Super-Admin hat immer alle Rechte
+  const hasPermission = (permission: keyof AdminPermissions): boolean => {
+    if (!isAdmin) return false;
+    if (isSuperAdmin) return true;
+    if (!currentAdmin?.permissions) return true; // Alte Accounts ohne Permissions haben alle Rechte
+    return currentAdmin.permissions[permission] ?? true;
+  };
+
+  // Prüfe Berechtigung und zeige Fehlermeldung wenn nicht vorhanden
+  const checkPermission = (permission: keyof AdminPermissions, actionName: string): boolean => {
+    if (hasPermission(permission)) return true;
+    addToast(`Keine Berechtigung: ${actionName}`, 'error');
+    return false;
+  };
 
   // Tournament Field Setting Persistence
   useEffect(() => {
@@ -2136,6 +2186,7 @@ const deletePlannerResult = (fixture: PlannedMatch) => {
 
 const savePlannerResult = (fixture: PlannedMatch, directScore?: string) => {
   if (!isAdmin) return;
+  if (!checkPermission('canEnterResults', 'Ergebnisse eingeben')) return;
   const scoreStr = (directScore || plannerScoreInput[fixture.id] || '').trim();
   if (!scoreStr) { addToast('Bitte Spielstand eintragen', 'error'); return; }
 
@@ -3112,6 +3163,8 @@ setIsAdmin(false);
 
 setCurrentUser('');
 
+setCurrentAdminId('');
+
 setAdminPasswordInput('');
 
 setAdminUsernameInput('');
@@ -3143,6 +3196,8 @@ if (inputHash === account.password) { // Vergleich mit gespeichertem Hash
 setIsAdmin(true);
 
 setCurrentUser(account.username);
+
+setCurrentAdminId(account.id);
 
 setAdminPasswordInput('');
 
@@ -3188,7 +3243,9 @@ username: newAdminUser,
 
 password: passwordHash, // Hash speichern
 
-isSuperAdmin: false
+isSuperAdmin: false,
+
+permissions: { ...DEFAULT_PERMISSIONS }
 
 };
 
@@ -3316,6 +3373,8 @@ closeConfirm();
 
 const deletePlayer = (id: string) => {
 
+if (!checkPermission('canManagePlayers', 'Spieler löschen')) return;
+
 triggerConfirm("Spieler und ALLE seine Ergebnisse löschen?", () => {
 
 updatePlayers(players.filter(p => p.id !== id));
@@ -3415,6 +3474,8 @@ addToast('Spiel aktualisiert');
 const handleAddTournament = () => {
 
 if (!newTournamentName || !isAdmin) return;
+
+if (!checkPermission('canManageTournaments', 'Turnier erstellen')) return;
 
 const newTournament: Tournament = {
 
@@ -6437,6 +6498,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             </select>
             <button
               onClick={() => {
+                if (!checkPermission('canManagePlanner', 'Spielplan verwalten')) return;
                 const mode: 'single' | 'double' = currentMode === 'auto'
                   ? (participantCount <= 4 ? 'double' : 'single')
                   : currentMode;
@@ -6469,6 +6531,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             </button>
             <button
               onClick={() => {
+                if (!checkPermission('canManagePlanner', 'Spielplan verwalten')) return;
                 setConfirmDialog({
                   isOpen: true,
                   message: `Gesamte Gruppe ${LEVEL_LABELS[level]} (${displayAgeGroup(plannerAgeGroup)}) löschen? Alle Fixtures und Punkte werden gelöscht.`,
@@ -7601,6 +7664,7 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 
 <h3 className="text-base md:text-lg font-bold mb-3 md:mb-4 flex items-center gap-2 text-emerald-400"><UserCog size={18} className="md:w-5 md:h-5"/> Admin Konten</h3>
 
+{isSuperAdmin && (
 <div className="flex flex-col sm:flex-row gap-2 mb-4">
 
 <input type="text" placeholder="Neuer Benutzername" className="flex-1 bg-slate-700 border-none rounded p-2 md:p-2.5 text-sm md:text-base text-white placeholder-slate-400" value={newAdminUser} onChange={e => setNewAdminUser(e.target.value)}/>
@@ -7610,27 +7674,86 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 <button onClick={handleAddAdmin} className="bg-emerald-600 hover:bg-emerald-500 px-3 md:px-4 py-2 md:py-2.5 rounded text-sm md:text-base font-bold whitespace-nowrap">Hinzufügen</button>
 
 </div>
+)}
 
-<div className="space-y-2">
+<div className="space-y-3">
 
-{admins.map(a => (
-
-<div key={a.id} className={`p-2 rounded flex justify-between items-center text-sm transition-colors ${darkMode ? 'bg-slate-700' : 'bg-white/10'}`}>
-
-<span>{a.username} {a.isSuperAdmin && <span className="text-xs text-emerald-400 ml-2">(Super Admin)</span>}</span>
-
-{!a.isSuperAdmin && (
+{admins.map(a => {
+  const permissions = a.permissions || DEFAULT_PERMISSIONS;
+  const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
+    canManagePlayers: 'Spieler verwalten',
+    canManageTournaments: 'Turniere verwalten',
+    canEnterResults: 'Ergebnisse eingeben',
+    canManagePlanner: 'Spielplan verwalten',
+    canExportData: 'Daten exportieren',
+  };
+  
+  return (
+<div key={a.id} className={`p-3 rounded-lg transition-colors ${darkMode ? 'bg-slate-700' : 'bg-white/10'}`}>
+  <div className="flex justify-between items-center mb-2">
+    <div className="flex items-center gap-2">
+      <span className="font-medium">{a.username}</span>
+      {a.isSuperAdmin && <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded">Super Admin</span>}
+    </div>
+    {!a.isSuperAdmin && isSuperAdmin && (
 
 <button onClick={() => handleDeleteAdmin(a.id)} className="text-red-400 hover:text-red-300"><Trash2 size={16}/></button>
 
-)}
-
+    )}
+  </div>
+  
+  {/* Berechtigungen - nur für Super-Admins sichtbar und nur für Nicht-Super-Admins bearbeitbar */}
+  {isSuperAdmin && !a.isSuperAdmin && (
+    <div className="mt-3 pt-3 border-t border-slate-600">
+      <div className="text-xs text-slate-400 mb-2 font-medium">Berechtigungen:</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {(Object.keys(PERMISSION_LABELS) as (keyof AdminPermissions)[]).map(perm => (
+          <label key={perm} className="flex items-center gap-2 cursor-pointer hover:bg-slate-600/50 p-1.5 rounded transition">
+            <input
+              type="checkbox"
+              checked={permissions[perm]}
+              onChange={(e) => {
+                const updatedAdmins = admins.map(admin => {
+                  if (admin.id !== a.id) return admin;
+                  return {
+                    ...admin,
+                    permissions: {
+                      ...permissions,
+                      [perm]: e.target.checked
+                    }
+                  };
+                });
+                updateAdmins(updatedAdmins);
+              }}
+              className="w-4 h-4 rounded border-slate-500 bg-slate-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-slate-800"
+            />
+            <span className="text-xs text-slate-300">{PERMISSION_LABELS[perm]}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )}
+  
+  {/* Anzeige der Berechtigungen für Nicht-Super-Admins (nur lesen) */}
+  {!isSuperAdmin && a.id === currentAdminId && (
+    <div className="mt-3 pt-3 border-t border-slate-600">
+      <div className="text-xs text-slate-400 mb-2 font-medium">Deine Berechtigungen:</div>
+      <div className="flex flex-wrap gap-1.5">
+        {(Object.keys(PERMISSION_LABELS) as (keyof AdminPermissions)[]).map(perm => (
+          <span 
+            key={perm} 
+            className={`text-xs px-2 py-1 rounded ${permissions[perm] ? 'bg-emerald-600/30 text-emerald-400' : 'bg-red-600/30 text-red-400'}`}
+          >
+            {permissions[perm] ? '✓' : '✗'} {PERMISSION_LABELS[perm]}
+          </span>
+        ))}
+      </div>
+    </div>
+  )}
 </div>
-
-))}
-
+  );
+})}
 </div>
-
 </div>
 
 {/* BACKUP & RESTORE */}
@@ -7646,6 +7769,7 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
   <button
     onClick={() => {
+      if (!checkPermission('canExportData', 'Daten exportieren')) return;
       exportBackup({
         players,
         tournaments,
@@ -7661,6 +7785,7 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
     <Database size={16} className="md:w-[18px] md:h-[18px]"/> <span className="hidden sm:inline">Backup erstellen</span><span className="sm:hidden">Erstellen</span>
   </button>
 
+  {isSuperAdmin && (
   <button
     onClick={() => {
       setConfirmDialog({
@@ -7700,11 +7825,14 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
   >
     <Database size={16} className="md:w-[18px] md:h-[18px]"/> <span className="hidden sm:inline">Backup wiederherstellen</span><span className="sm:hidden">Wiederherstellen</span>
   </button>
+  )}
 </div>
 
+{isSuperAdmin && (
 <div className={`mt-3 md:mt-4 p-2 md:p-3 rounded-lg border text-[10px] md:text-xs ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
   <strong>⚠️ Wichtig:</strong> Das Wiederherstellen eines Backups überschreibt ALLE aktuellen Daten. Erstelle vorher ein aktuelles Backup!
 </div>
+)}
 
 </div>
 
