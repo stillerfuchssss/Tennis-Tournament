@@ -4186,7 +4186,7 @@ const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
 
 const levelForMatch = getMatchLevel(m, roundLevel);
 
-const matchWeight = getGroupSizeWeight(countParticipants(round.id, levelForMatch));
+const matchWeight = getGroupSizeWeight(countParticipants(round.id, levelForMatch), ageGroup, levelForMatch || undefined);
 
 aggregatedPoints += base * matchWeight;
 
@@ -4214,7 +4214,7 @@ const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
 
 const levelForMatch = getMatchLevel(m, player.level || null);
 
-const w = getGroupSizeWeight(countParticipants(null, levelForMatch));
+const w = getGroupSizeWeight(countParticipants(null, levelForMatch), ageGroup, levelForMatch || undefined);
 
 aggregatedPoints += base * w;
 
@@ -4236,7 +4236,7 @@ const summaryLevel = getMatchLevel(res.matches[0], player.level || null);
 
 const uniqueTournParticipants = countParticipants('all', summaryLevel);
 
-const tournWeight = getGroupSizeWeight(uniqueTournParticipants);
+const tournWeight = getGroupSizeWeight(uniqueTournParticipants, ageGroup, summaryLevel || undefined);
 // Teilnahmepunkte: 1 Punkt pro Spieltag (Round) + 1 für Matches ohne Round
 const participationBonus = participationCount + (matchesNoRound.length > 0 ? 1 : 0);
 
@@ -4254,7 +4254,7 @@ raw: aggregatedPoints.toFixed(1),
 
 weighted: aggregatedPoints.toFixed(1),
 
-stats: `Teilnahme: ${participationBonus} ? ${totalWins} S (x${tournWeight.toFixed(2)}) / ${totalCL} KN (x${tournWeight.toFixed(2)})`,
+stats: `${totalWins} S (x${tournWeight.toFixed(2)}) / ${totalCL} KN (x${tournWeight.toFixed(2)})`,
 
 participationPoints: participationBonus, // Ungewichtet, pro Spieltag
 
@@ -4299,7 +4299,7 @@ const participantCount = countParticipants(rankingRoundScope === 'all' ? 'all' :
 
 
 
-const groupWeight = getGroupSizeWeight(participantCount);
+const groupWeight = getGroupSizeWeight(participantCount, ageGroup, levelInScope || undefined);
 
 let matchPoints = 0;
 
@@ -4315,7 +4315,7 @@ const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
 
 const levelForMatch = getMatchLevel(m, levelInScope);
 
-const weight = getGroupSizeWeight(countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelForMatch));
+const weight = getGroupSizeWeight(countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelForMatch), ageGroup, levelForMatch || undefined);
 
 matchPoints += base * weight;
 
@@ -4342,7 +4342,7 @@ raw: turnierScore.toFixed(1),
 
 weighted: turnierScore.toFixed(1),
 
-stats: `Teilnahme: ${participationPoints} ? ${wins} S (x${groupWeight.toFixed(2)}) / ${closeLosses} KN (x${groupWeight.toFixed(2)})`,
+stats: `${wins} S (x${groupWeight.toFixed(2)}) / ${closeLosses} KN (x${groupWeight.toFixed(2)})`,
 
 participationPoints: participationPoints, // Ungewichtet, pro Spieltag
 
@@ -5602,7 +5602,10 @@ return (
 
 <div className={`text-[9px] md:text-[10px] font-medium ${darkMode ? 'text-slate-500' : 'text-slate-500'}`}>
 
-{player.details[0]?.participationPoints ? `+${player.details[0].participationPoints} Teiln. • ` : ''}
+{(() => {
+  const totalParticipation = player.details.reduce((sum: number, d: any) => sum + (d.participationPoints || 0), 0);
+  return totalParticipation > 0 ? `+${totalParticipation} Teiln. • ` : '';
+})()}
 
 {player.details[0]?.stats}
 
@@ -6448,8 +6451,8 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 {(['A','B','C'] as Level[]).map(level => {
   const key = getPlannerKey(plannerAgeGroup, level, plannerSelectedRoundId);
   const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
-  // Zeige ALLE Ergebnisse für das ausgewählte Turnier (nicht nach Spieltag gefiltert, damit Punkte korrekt angezeigt werden)
-  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, undefined, fixtures);
+  // Zeige NUR Ergebnisse für den aktuell ausgewählten Spieltag (nicht Gesamtpunkte)
+  const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId, fixtures);
   const stats = unsortedStats.slice().sort((a, b) => b.points - a.points);
   const resolveName = (id: string) => players.find(p => p.id === id)?.name || 'Unbekannt';
 
