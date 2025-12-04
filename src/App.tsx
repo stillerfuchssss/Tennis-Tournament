@@ -1932,7 +1932,9 @@ return parseFloat(Math.max(1.0, weight).toFixed(2));
 
 const getMatchLevel = (match: MatchRecord, fallback?: Level | null) => match.levelAtMatch || fallback || null;
 
-const getPlannerKey = (age: AgeGroup, level: Level) => `${age}-${level}`;
+// Key für Planner-Fixtures: enthält Spieltag, Altersgruppe und Level
+const getPlannerKey = (age: AgeGroup, level: Level, roundId?: string) => 
+  roundId ? `${roundId}-${age}-${level}` : `${age}-${level}`;
 
 const generateRoundRobin = (ids: string[], mode: 'single' | 'double') => {
   const players = [...ids];
@@ -2107,9 +2109,10 @@ const getPlayersWithoutGroup = useMemo(() => {
   });
   
   // Sammle alle Spieler die bereits Ergebnisse für diesen Turniertag haben
+  const currentRoundId = `planner-${plannerSelectedRoundId}`;
   results.forEach(r => {
     r.matches.forEach(m => {
-      if (m.roundId?.includes(plannerSelectedRoundId)) {
+      if (m.roundId === currentRoundId) {
         playersInGroups.add(r.playerId);
       }
     });
@@ -2158,7 +2161,7 @@ const generatePlannerForAgeGroup = (age: AgeGroup) => {
       p1Id: f.p1Id,
       p2Id: f.p2Id
     }));
-    newMap[getPlannerKey(age, level)] = fixtures;
+    newMap[getPlannerKey(age, level, plannerSelectedRoundId)] = fixtures;
   });
   updatePlannerFixtures(newMap);
   addToast(`Auslosung für ${displayAgeGroup(age)} aktualisiert`, 'success');
@@ -2195,7 +2198,7 @@ const deletePlannerResult = (fixture: PlannedMatch) => {
 
   // Füge das Fixture wieder zur Auslosung hinzu
   const newMap = { ...plannerFixtures };
-  const key = getPlannerKey(fixture.ageGroup, fixture.level);
+  const key = getPlannerKey(fixture.ageGroup, fixture.level, plannerSelectedRoundId);
   if (!newMap[key]) newMap[key] = [];
   newMap[key].push(fixture);
   updatePlannerFixtures(newMap);
@@ -2254,7 +2257,7 @@ const savePlannerResult = (fixture: PlannedMatch, directScore?: string) => {
 
   // Entferne das gespielte Fixture aus der Liste
   const newMap = { ...plannerFixtures };
-  const groupKey = getPlannerKey(fixture.ageGroup, fixture.level);
+  const groupKey = getPlannerKey(fixture.ageGroup, fixture.level, plannerSelectedRoundId);
   newMap[groupKey] = (newMap[groupKey] || []).filter(f => f.id !== fixture.id);
   updatePlannerFixtures(newMap);
 
@@ -2303,7 +2306,7 @@ const quickAddPlannerPlayer = () => {
 
   // Spieler wird zur Planung hinzugefügt (in der Ziel-Altersgruppe/Level)
   // Erlaubt jüngere Spieler in ältere Gruppen einzufügen
-  const key = getPlannerKey(plannerTargetAgeGroup, plannerNewLevel);
+  const key = getPlannerKey(plannerTargetAgeGroup, plannerNewLevel, plannerSelectedRoundId);
   const newMatch: PlannedMatch = {
     id: generateId(),
     ageGroup: plannerTargetAgeGroup,
@@ -6233,7 +6236,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
         // Sammle Daten für alle drei Levels
         const allGroupsData = (['A', 'B', 'C'] as Level[]).map(level => {
-          const key = getPlannerKey(plannerAgeGroup, level);
+          const key = getPlannerKey(plannerAgeGroup, level, plannerSelectedRoundId);
           const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
           const { stats: unsortedStats } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, plannerSelectedRoundId, fixtures);
           const stats = unsortedStats.slice().sort((a, b) => b.points - a.points);
@@ -6272,7 +6275,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             // Sammle ALLE Fixtures, die gelöscht werden sollen (BEVOR wir sie löschen)
             const allFixturesToDelete: PlannedMatch[] = [];
             levels.forEach(level => {
-              const key = getPlannerKey(plannerAgeGroup, level);
+              const key = getPlannerKey(plannerAgeGroup, level, plannerSelectedRoundId);
               const groupFixtures = plannerFixtures[key] || [];
               allFixturesToDelete.push(...groupFixtures);
             });
@@ -6284,8 +6287,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               playerIds.add(f.p2Id);
             });
 
-            // Entferne ALLE gespeicherten Ergebnisse für diese Altersgruppe und Level
-            // (sowohl planner- als auch normale Matches)
+            // Entferne NUR gespeicherte Ergebnisse für diese Altersgruppe und Level für DIESEN Spieltag
+            // (nicht von anderen Spieltagen)
+            const currentRoundId = `planner-${plannerSelectedRoundId}`;
             const updatedResults = results.map(playerResult => {
               const player = players.find(p => p.id === playerResult.playerId);
               if (!player) return playerResult;
@@ -6298,9 +6302,13 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                 ...playerResult,
                 matches: playerResult.matches.filter(m => {
                   // Behalte Matches die NICHT zu einem der gelöschten Level gehören
+                  // ODER die nicht zu diesem Spieltag gehören
                   const matchLevel = getMatchLevel(m, player.level || null);
-                  const shouldDelete = levels.includes(matchLevel as Level);
-                  return !shouldDelete;
+                  const isThisLevel = levels.includes(matchLevel as Level);
+                  const isThisRound = m.roundId === currentRoundId;
+                  
+                  // Nur löschen wenn beides zutrifft: dieses Level UND dieser Spieltag
+                  return !(isThisLevel && isThisRound);
                 })
               };
             });
@@ -6308,7 +6316,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             // Lösche alle Fixtures
             const updatedFixtures = { ...plannerFixtures };
             levels.forEach(level => {
-              const key = getPlannerKey(plannerAgeGroup, level);
+              const key = getPlannerKey(plannerAgeGroup, level, plannerSelectedRoundId);
               updatedFixtures[key] = [];
             });
 
@@ -6438,7 +6446,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 </div>
 
 {(['A','B','C'] as Level[]).map(level => {
-  const key = getPlannerKey(plannerAgeGroup, level);
+  const key = getPlannerKey(plannerAgeGroup, level, plannerSelectedRoundId);
   const fixtures = (plannerFixtures[key] || []).slice().sort((a,b) => a.round - b.round);
   // Zeige ALLE Ergebnisse für das ausgewählte Turnier (nicht nach Spieltag gefiltert, damit Punkte korrekt angezeigt werden)
   const { stats: unsortedStats, weight, participantCount } = collectPlannerStats(plannerAgeGroup, level, plannerSelectedTournamentId, undefined, fixtures);
@@ -6591,8 +6599,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       playerIdsFromStats.add(f.p2Id);
                     });
 
-                    // Entferne alle gespeicherten Ergebnisse für diese Gruppe
-                    // Basierend auf: Spieler-ID, Level, und roundId (planner oder normal)
+                    // Entferne alle gespeicherten Ergebnisse für diese Gruppe NUR für diesen Spieltag
+                    // Basierend auf: Spieler-ID, Level, und roundId (exakte Übereinstimmung)
+                    const currentRoundId = `planner-${plannerSelectedRoundId}`;
                     const updatedResults = results.map(playerResult => {
                       // Nur Ergebnisse für Spieler in dieser Gruppe bearbeiten
                       if (!playerIdsFromStats.has(playerResult.playerId)) return playerResult;
@@ -6607,19 +6616,18 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                           // Nur Matches für dieses Level löschen
                           if (matchLevel !== level) return true; // Behalten
                           
-                          // Prüfe ob es ein Planner-Match für den aktuellen Spieltag ist
-                          const isPlannerMatch = m.roundId?.startsWith('planner-') && 
-                            m.roundId.includes(plannerSelectedRoundId);
+                          // Prüfe ob es ein Planner-Match für genau diesen Spieltag ist (exakte Übereinstimmung)
+                          const isPlannerMatchForThisRound = m.roundId === currentRoundId;
                           
                           // Oder ein Match das zu einem Fixture in dieser Gruppe gehört
                           const belongsToFixture = groupFixtures.some(f =>
-                            (m.roundId === `planner-${f.round}` || m.roundId === `planner-${plannerSelectedRoundId}`) &&
+                            (m.roundId === currentRoundId) &&
                             ((playerResult.playerId === f.p1Id && m.opponentId === f.p2Id) ||
                              (playerResult.playerId === f.p2Id && m.opponentId === f.p1Id))
                           );
                           
-                          // Lösche wenn es ein Planner-Match ist oder zu einem Fixture gehört
-                          return !(isPlannerMatch || belongsToFixture);
+                          // Lösche wenn es ein Planner-Match für diesen Spieltag ist oder zu einem Fixture gehört
+                          return !(isPlannerMatchForThisRound || belongsToFixture);
                         })
                       };
                     });
@@ -6720,29 +6728,31 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                               const newPlannerFixtures = { ...plannerFixtures, [key]: updatedFixtures };
                               updatePlannerFixtures(newPlannerFixtures);
 
-                              // Entferne ALLE Ergebnisse für diesen Spieler in diesem Level
-                              // (auch wenn keine Fixtures mehr vorhanden sind)
+                              // Entferne NUR Ergebnisse für diesen Spieler in diesem Level UND diesem Spieltag
+                              // (nicht von anderen Spieltagen)
+                              const currentRoundId = `planner-${plannerSelectedRoundId}`;
                               const updatedResults = results.map(playerResult => {
-                                // Für den zu löschenden Spieler: alle Matches in diesem Level löschen
+                                // Für den zu löschenden Spieler: nur Matches dieses Spieltags in diesem Level löschen
                                 if (playerResult.playerId === s.player.id) {
                                   return {
                                     ...playerResult,
                                     matches: playerResult.matches.filter(m => {
                                       const matchLevel = getMatchLevel(m, s.player.level || null);
-                                      // Behalte nur Matches die NICHT zu diesem Level gehören
-                                      // und auch nicht zu Planner-Matches für diesen Spieltag
-                                      const isPlannerMatch = m.roundId?.includes(plannerSelectedRoundId);
-                                      return matchLevel !== level || !isPlannerMatch;
+                                      // Behalte Matches wenn:
+                                      // - anderes Level ODER
+                                      // - nicht dieser Spieltag (exakte Übereinstimmung prüfen)
+                                      const isThisRound = m.roundId === currentRoundId;
+                                      return matchLevel !== level || !isThisRound;
                                     })
                                   };
                                 }
                                 
-                                // Für andere Spieler: Matches gegen diesen Spieler löschen
+                                // Für andere Spieler: Matches gegen diesen Spieler nur für diesen Spieltag löschen
                                 return {
                                   ...playerResult,
                                   matches: playerResult.matches.filter(m => {
-                                    // Wenn Gegner der zu löschende Spieler ist und es ein Planner-Match ist
-                                    if (m.opponentId === s.player.id && m.roundId?.includes(plannerSelectedRoundId)) {
+                                    // Wenn Gegner der zu löschende Spieler ist und es genau dieser Spieltag ist
+                                    if (m.opponentId === s.player.id && m.roundId === currentRoundId) {
                                       const matchLevel = getMatchLevel(m, players.find(p => p.id === playerResult.playerId)?.level || null);
                                       return matchLevel !== level; // Löschen wenn gleiches Level
                                     }
