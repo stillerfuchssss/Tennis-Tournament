@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { db } = require('./database');
 
 // === HIER NEUES PASSWORT EINGEBEN ===
-const NEW_PASSWORD = 'deinNeuesPasswort';  // <-- Ändere das!
+const NEW_PASSWORD = 'tennis';  // <-- Ändere das!
 // =====================================
 
 async function changePassword() {

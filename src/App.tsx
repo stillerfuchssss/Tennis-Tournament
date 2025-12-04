@@ -1510,10 +1510,26 @@ const [plannerSelectedPlayerId, setPlannerSelectedPlayerId] = useState('');
 
   // Berechtigungsprüfung - Super-Admin hat immer alle Rechte
   const hasPermission = (permission: keyof AdminPermissions): boolean => {
+    // Nicht eingeloggt = keine Berechtigung
     if (!isAdmin) return false;
-    if (isSuperAdmin) return true;
-    if (!currentAdmin?.permissions) return true; // Alte Accounts ohne Permissions haben alle Rechte
-    return currentAdmin.permissions[permission] ?? true;
+    
+    // Admins werden noch geladen - warte auf Daten
+    if (admins.length === 0) return false;
+    
+    // Admin nicht gefunden - keine Berechtigung
+    if (!currentAdmin) return false;
+    
+    // Super-Admin hat immer alle Rechte
+    if (currentAdmin.isSuperAdmin) return true;
+    
+    // Prüfe die spezifische Berechtigung
+    const permissions = currentAdmin.permissions;
+    
+    // Wenn keine Permissions definiert sind, nutze Default (alle erlaubt für Abwärtskompatibilität)
+    if (!permissions) return true;
+    
+    // Prüfe die spezifische Berechtigung
+    return permissions[permission] === true;
   };
 
   // Prüfe Berechtigung und zeige Fehlermeldung wenn nicht vorhanden
@@ -2039,6 +2055,7 @@ const getExcludedPlayerIds = (roundId: string, ageGroup: AgeGroup, level: Level)
 
 // Spieler aus Gruppe ausschließen (wird nicht mehr bei Auslosung berücksichtigt)
 const excludePlayerFromGroup = (playerId: string, ageGroup: AgeGroup, level: Level) => {
+  if (!checkPermission('canManagePlanner', 'Spieler aus Gruppe entfernen')) return;
   if (!plannerSelectedRoundId) {
     addToast('Bitte zuerst einen Turniertag auswählen', 'error');
     return;
@@ -2060,6 +2077,7 @@ const excludePlayerFromGroup = (playerId: string, ageGroup: AgeGroup, level: Lev
 
 // Spieler wieder zur Gruppe hinzufügen
 const includePlayerInGroup = (playerId: string, ageGroup: AgeGroup, level: Level, roundId?: string) => {
+  if (!checkPermission('canManagePlanner', 'Spieler zur Gruppe hinzufügen')) return;
   const targetRound = roundId || plannerSelectedRoundId;
   if (!targetRound) return;
   
@@ -2113,6 +2131,7 @@ const getPlayersWithoutGroup = useMemo(() => {
 }, [players, plannerFixtures, results, plannerSelectedRoundId, excludedPlayers]);
 
 const generatePlannerForAgeGroup = (age: AgeGroup) => {
+  if (!checkPermission('canManagePlanner', 'Spielplan generieren')) return;
   const newMap = { ...plannerFixtures };
   (['A','B','C'] as Level[]).forEach(level => {
     // Berücksichtige ausgeschlossene Spieler
@@ -2186,7 +2205,11 @@ const deletePlannerResult = (fixture: PlannedMatch) => {
 
 const savePlannerResult = (fixture: PlannedMatch, directScore?: string) => {
   if (!isAdmin) return;
-  if (!checkPermission('canEnterResults', 'Ergebnisse eingeben')) return;
+  // canEnterResults ODER canManagePlanner berechtigt zur Ergebniseingabe im Planner
+  if (!hasPermission('canEnterResults') && !hasPermission('canManagePlanner')) {
+    addToast('Keine Berechtigung: Ergebnisse eingeben', 'error');
+    return;
+  }
   const scoreStr = (directScore || plannerScoreInput[fixture.id] || '').trim();
   if (!scoreStr) { addToast('Bitte Spielstand eintragen', 'error'); return; }
 
@@ -2362,6 +2385,8 @@ const activeBracket = brackets[activeBracketKey] || brackets[activeBracketAge];
 
 const generateBracket = (randomize: boolean, playerList?: Player[]) => {
 
+if (!checkPermission('canManagePlanner', 'Bracket generieren')) return;
+
 const targetAge = playerList ? activeBracketAge : activeBracketAge; // Simplification, usually same
 const targetLevel = activeBracketLevel;
 
@@ -2500,6 +2525,8 @@ addToast(`Turnierbaum (${targetAge}) erstellt`);
 
 
 const generateGroups = () => {
+
+if (!checkPermission('canManagePlanner', 'Gruppen generieren')) return;
 
 const candidates = players.filter(p => canPlayInAgeGroup(p, activeBracketAge) && p.level === activeBracketLevel);
 
@@ -3277,6 +3304,8 @@ updateAdmins(admins.filter(a => a.id !== id));
 
 const handleRegistration = () => {
 
+if (!checkPermission('canManagePlayers', 'Spieler erstellen')) return;
+
 if (!regName || !regBirthDate) {
 
 addToast('Bitte Name und Datum ausfuellen', 'error');
@@ -3345,6 +3374,8 @@ setRegAllowAgeOverride(false); setRegManualAgeGroup('');
 
 const approveRegistration = (req: RegistrationRequest) => {
 
+if (!checkPermission('canManagePlayers', 'Spieler zulassen')) return;
+
 updatePlayers([...players, { id: generateId(), name: req.name, birthDate: req.birthDate, level: req.level, club: req.club, email: req.email }]);
 
 updateRegistrations(pendingRegistrations.filter(r => r.id !== req.id));
@@ -3356,6 +3387,8 @@ addToast(`${req.name} zugelassen`);
 
 
 const rejectRegistration = (id: string) => {
+
+if (!checkPermission('canManagePlayers', 'Anmeldung ablehnen')) return;
 
 triggerConfirm("Anmeldung wirklich ablehnen?", () => {
 
@@ -3394,6 +3427,8 @@ closeConfirm();
 
 
 const handleUpdateMatchScore = (matchId: string, playerId: string, newScoreRaw: string) => {
+
+if (!checkPermission('canEnterResults', 'Ergebnis bearbeiten')) return;
 
 if (!newScoreRaw) return;
 
@@ -3505,6 +3540,8 @@ addToast('Turnier erstellt');
 
 const handleAddRound = (tournamentId: string) => {
 
+if (!checkPermission('canManageTournaments', 'Spieltag hinzufügen')) return;
+
 if (!newRoundName) return;
 
 const updatedTournaments = tournaments.map(t => {
@@ -3565,7 +3602,7 @@ closeConfirm();
 
 const deleteTournament = (id: string) => {
 
-if (!isAdmin) return;
+if (!checkPermission('canManageTournaments', 'Turnier löschen')) return;
 
 
 triggerConfirm("Turnier und ALLE Ergebnisse endgültig löschen?", () => {
@@ -3593,6 +3630,8 @@ closeConfirm();
 const handleAddResult = () => {
 
 if (!selectedPlayerId || !selectedTournamentId || !matchAnalysis || !selectedOpponentId) return;
+
+if (!checkPermission('canEnterResults', 'Ergebnisse eingeben')) return;
 
 if (!selectedRoundId) { setRoundError(true); return; }
 
@@ -4704,6 +4743,8 @@ setEditingMatchId(null);
 
 const savePlayerMeta = () => {
 
+if (!checkPermission('canManagePlayers', 'Spieler bearbeiten')) return;
+
 const manualAge = editPlayerAgeGroup === 'auto' ? undefined : editPlayerAgeGroup;
 const cleanedClub = editPlayerClub.trim();
 const cleanedEmail = editPlayerEmail.trim();
@@ -5309,11 +5350,13 @@ value={adminPasswordInput} onChange={(e) => setAdminPasswordInput(e.target.value
 
 </button>
 
+{(isAdmin && hasPermission('canManagePlayers')) && (
 <button onClick={() => setActiveTab('players')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[80px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'players' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
 <Users size={16} /> <span className="hidden sm:inline">Spieler</span><span className="sm:hidden">Spieler</span>
 
 </button>
+)}
 
 <button onClick={() => setActiveTab('register')} className={`flex-1 py-3 md:py-4 px-2 md:px-4 min-w-[100px] md:min-w-[120px] font-medium flex justify-center items-center gap-1 md:gap-2 border-b-2 transition text-xs md:text-base ${activeTab === 'register' ? 'border-emerald-500 text-emerald-700' : `border-transparent ${darkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}`}>
 
@@ -6163,7 +6206,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 ))}
 </select>
 </div>
-{isAdmin && (
+{isAdmin && hasPermission('canManagePlanner') && (
   <>
     <button onClick={() => generatePlannerForAgeGroup(plannerAgeGroup)} className="w-full px-3 md:px-4 py-2.5 md:py-3 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs md:text-sm font-bold rounded-lg flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all">
       <Shuffle size={16} className="md:w-[18px] md:h-[18px]"/> Alle Leistungsklassen auslosen
@@ -6182,6 +6225,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
       Spieler ohne Gruppe {getPlayersWithoutGroup.length > 0 && `(${getPlayersWithoutGroup.length})`}
     </button>
 
+    {hasPermission('canExportData') && (
     <button
       onClick={() => {
         const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
@@ -6214,6 +6258,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
     >
       <ClipboardList size={16} className="md:w-[18px] md:h-[18px]"/> Alle Gruppen drucken
     </button>
+    )}
 
     <button
       onClick={() => {
@@ -6485,7 +6530,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             )}
           </div>
         </div>
-        {isAdmin && (
+        {isAdmin && hasPermission('canManagePlanner') && (
           <div className="flex flex-col gap-2 w-full lg:min-w-[200px] lg:w-auto">
             <select
               value={currentMode}
@@ -6594,6 +6639,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
               <Trash2 size={12} className="md:w-4 md:h-4"/> Gruppe löschen
             </button>
 
+            {hasPermission('canExportData') && (
             <button
               onClick={() => {
                 const selectedTournament = tournaments.find(t => t.id === plannerSelectedTournamentId);
@@ -6613,6 +6659,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
             >
               <ClipboardList size={12} className="md:w-4 md:h-4"/> Drucken
             </button>
+            )}
           </div>
         )}
       </div>
@@ -6815,7 +6862,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
                       </span>
                     </div>
                   )}
-                  {isAdmin && (() => {
+                  {isAdmin && hasPermission('canEnterResults') && (() => {
                     // Prüfe ob Match bereits gespeichert wurde (sowohl planner- als auch normale roundId)
                     const p1Result = results.find(r => r.playerId === f.p1Id && r.tournamentId === plannerSelectedTournamentId);
                     const savedMatch = p1Result?.matches.find(m => 
@@ -6941,7 +6988,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
 {/* --- TAB: SPIELER (NEU) --- */}
 
-{activeTab === 'players' && (
+{activeTab === 'players' && isAdmin && hasPermission('canManagePlayers') && (
 
 <div className="space-y-6 animate-in fade-in">
 
@@ -6967,6 +7014,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
 
 {isAdmin && (
   <>
+    {hasPermission('canExportData') && (
     <button
       onClick={() => exportPlayersToExcel(players)}
       className="bg-emerald-600 text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2 hover:bg-emerald-700"
@@ -6974,7 +7022,9 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
     >
       <Database size={14} className="md:w-4 md:h-4"/> <span className="hidden sm:inline">Export Excel</span><span className="sm:hidden">Export</span>
     </button>
+    )}
 
+    {hasPermission('canExportData') && (
     <button
       onClick={() => {
         const input = document.createElement('input');
@@ -7003,6 +7053,7 @@ onChange={(e) => updateGroupMatch(gIndex, mIndex, e.target.value)}
     >
       <Database size={14} className="md:w-4 md:h-4"/> <span className="hidden sm:inline">Import Meldeliste</span><span className="sm:hidden">Import</span>
     </button>
+    )}
 
     <button onClick={() => setIsCreatingTeam(!isCreatingTeam)} className="bg-purple-600 text-white px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1 md:gap-2 hover:bg-purple-700">
 
@@ -7137,7 +7188,7 @@ onChange={e => setTeamSearch2(e.target.value)}
 
 </td>
 
-{isAdmin && (
+{isAdmin && hasPermission('canManagePlayers') && (
 
 <td className="p-2 md:p-4">
 
@@ -7643,7 +7694,7 @@ className={`w-full mb-1 p-2 md:p-2.5 text-xs md:text-sm border rounded transitio
 
 
 
-<button onClick={handleAddResult} disabled={!selectedPlayerId || !selectedTournamentId || !matchAnalysis || !selectedOpponentId} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 dark:disabled:text-slate-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30">Match Speichern</button>
+<button onClick={handleAddResult} disabled={!selectedPlayerId || !selectedTournamentId || !matchAnalysis || !selectedOpponentId || !hasPermission('canEnterResults')} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 dark:disabled:text-slate-500 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-emerald-200 dark:shadow-emerald-900/30">{hasPermission('canEnterResults') ? 'Match Speichern' : 'Keine Berechtigung'}</button>
 
 </div>
 
