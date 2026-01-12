@@ -1531,10 +1531,6 @@ const TennisManager = () => {
   const [excludedPlayers, setExcludedPlayers] = useState<Record<string, string[]>>({});
   const [showExcludedPlayersModal, setShowExcludedPlayersModal] = useState(false);
 
-  // Neue States für individuelles Spieler-Hinzufügen pro Level
-  const [isAddingToLevel, setIsAddingToLevel] = useState<Level | null>(null);
-  const [levelSearchQuery, setLevelSearchQuery] = useState('');
-
   // Spieler-Auswahl Modal vor Auslosung
   const [showPlayerSelectionModal, setShowPlayerSelectionModal] = useState(false);
   const [playerSelectionLevel, setPlayerSelectionLevel] = useState<Level>('C');
