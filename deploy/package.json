@@ -1,17 +1,14 @@
 {
-  "name": "tennis-manager-production",
+  "name": "tennis-server",
   "version": "1.0.0",
-  "description": "Tennis Tournament Manager",
-  "main": "server/index.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node index.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "sqlite3": "^5.1.6"
-  },
-  "engines": {
-    "node": "21.7.3"
   }
 }
