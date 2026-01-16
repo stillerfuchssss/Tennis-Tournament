@@ -176,7 +176,7 @@ app.put('/api/results/match', async (req, res) => {
 
 // Atomares Match löschen
 app.delete('/api/results/match', async (req, res) => {
-    const { playerId, tournamentId, matchId, roundId, opponentId } = req.body;
+    const { playerId, tournamentId, matchId, roundId, opponentId, fixtureId } = req.body;
 
     if (!playerId || !tournamentId) {
         return res.status(400).json({ error: 'playerId und tournamentId sind erforderlich' });
@@ -194,18 +194,30 @@ app.delete('/api/results/match', async (req, res) => {
         const playerResultIdx = results.findIndex(r => r.playerId === playerId && r.tournamentId === tournamentId);
 
         if (playerResultIdx >= 0) {
-            // Lösche Match basierend auf matchId ODER roundId+opponentId Kombination
+            // Lösche Match basierend auf (Priorität):
+            // 1. fixtureId (eindeutigster Identifier!)
+            // 2. matchId
+            // 3. roundId+opponentId (FALLBACK - nur wenn fixtureId nicht vorhanden)
             results[playerResultIdx].matches = results[playerResultIdx].matches.filter(m => {
-                if (matchId && m.id === matchId) return false;
-                if (roundId && opponentId && m.roundId === roundId && m.opponentId === opponentId) return false;
+                // PRIORITÄT 1: fixtureId (eindeutig pro Fixture)
+                if (fixtureId && m.fixtureId === fixtureId) {
+                    console.log(`🗑️ Lösche Match via fixtureId: ${fixtureId}`);
+                    return false;
+                }
+                // PRIORITÄT 2: matchId
+                if (matchId && m.id === matchId) {
+                    console.log(`🗑️ Lösche Match via matchId: ${matchId}`);
+                    return false;
+                }
+                // FALLBACK: roundId+opponentId (NUR wenn fixtureId NICHT angegeben wurde!)
+                if (!fixtureId && roundId && opponentId && m.roundId === roundId && m.opponentId === opponentId) {
+                    console.log(`🗑️ Lösche Match via roundId+opponentId Fallback: ${roundId} vs ${opponentId}`);
+                    return false;
+                }
                 return true;
             });
 
             // Entferne leeren Result-Eintrag NICHT - Spieler soll erhalten bleiben!
-            // Das war möglicherweise die Ursache für "Spieler verschwinden"
-            // if (results[playerResultIdx].matches.length === 0) {
-            //     results.splice(playerResultIdx, 1);
-            // }
         }
 
         // Speichere zurück
@@ -221,11 +233,11 @@ app.delete('/api/results/match', async (req, res) => {
 });
 
 // --- FRONTEND AUSLIEFERN ---
-app.use(express.static(path.join(__dirname, '../dist')));
+app.use(express.static(__dirname));
 
 // Serve SPA fallback for any non-API route
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // SERVER START - erst nach DB-Init

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 
 import {
@@ -103,7 +103,7 @@ const apiSaveMatchAtomic = async (playerId: string, tournamentId: string, match:
   }
 };
 
-const apiDeleteMatchAtomic = async (playerId: string, tournamentId: string, roundId: string, opponentId: string): Promise<boolean> => {
+const apiDeleteMatchAtomic = async (playerId: string, tournamentId: string, fixtureId: string): Promise<boolean> => {
   if (!serverConnectionOK) {
     console.warn("⚠️ Atomares Löschen verhindert - Server-Verbindung noch nicht bestätigt");
     return false;
@@ -113,7 +113,7 @@ const apiDeleteMatchAtomic = async (playerId: string, tournamentId: string, roun
     const res = await fetch(`${API_URL}/api/results/match`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, tournamentId, roundId, opponentId })
+      body: JSON.stringify({ playerId, tournamentId, fixtureId })
     });
     if (!res.ok) {
       console.error("Atomarer Löschfehler: Server antwortete mit", res.status);
@@ -167,7 +167,7 @@ const hashPassword = async (password: string): Promise<string> => {
 
 type Level = 'A' | 'B' | 'C';
 type AgeGroup = 'Red' | 'Orange' | 'Green' | 'Yellow';
-type ScoringMode = 'sets' | 'race4' | 'race10' | 'race15';
+type ScoringMode = 'sets' | 'race4' | 'race7' | 'race10' | 'race15';
 type PlannerTab = 'ranking' | 'bracket' | 'planner' | 'players' | 'register' | 'input' | 'admin';
 
 const LEVEL_LABELS: Record<Level, string> = {
@@ -360,6 +360,7 @@ type MatchRecord = {
   timestamp: number;
   scoringMode?: ScoringMode;
   levelAtMatch?: Level;
+  ageGroupAtMatch?: AgeGroup; // Age group where the match was played
   fixtureId?: string; // Unique fixture ID for proper identification
 
 };
@@ -2088,6 +2089,25 @@ const TennisManager = () => {
 
   const getMatchLevel = (match: MatchRecord, fallback?: Level | null) => match.levelAtMatch || fallback || null;
 
+  // Helper: Ermittelt das Level eines Spielers für einen spezifischen Spieltag
+  // Schaut zuerst in groupMembers, dann Fallback auf Profil-Level
+  const getPlayerLevelForRound = (playerId: string, roundId: string | undefined, ageGroup: AgeGroup): Level | null => {
+    if (!roundId) return players.find(p => p.id === playerId)?.level || null;
+
+    // Prüfe in welchem Level der Spieler für diesen Spieltag eingetragen ist
+    const levels: Level[] = ['A', 'B', 'C'];
+    for (const level of levels) {
+      const memberKey = `${roundId}-${ageGroup}-${level}`;
+      const members = groupMembers[memberKey] || [];
+      if (members.includes(playerId)) {
+        return level;
+      }
+    }
+
+    // Fallback: aktuelles Profil-Level
+    return players.find(p => p.id === playerId)?.level || null;
+  };
+
   // Key für Planner-Fixtures: enthält Spieltag, Altersgruppe und Level
   const getPlannerKey = (age: AgeGroup, level: Level, roundId?: string) =>
     roundId ? `${roundId}-${age}-${level}` : `${age}-${level}`;
@@ -2122,7 +2142,6 @@ const TennisManager = () => {
 
     return (age: AgeGroup, level: Level, tournamentId?: string, roundId?: string, groupFixtures?: PlannedMatch[]) => {
       // Cache-Key erstellen - inkludiert jetzt auch relevante Match-Daten zur Invalidierung
-      // WICHTIG: Wir hashen die Fixture-IDs und relevante Result-Daten für bessere Cache-Invalidierung
       const fixtureHash = groupFixtures?.map(f => f.id).join(',') || '';
       const resultsHash = results.filter(r =>
         !tournamentId || r.tournamentId === tournamentId
@@ -2147,26 +2166,42 @@ const TennisManager = () => {
       const memberKey = `${roundId}-${age}-${level}`;
       const persistentMemberIds = new Set(groupMembers[memberKey] || []);
 
-      // Filtere Spieler: Zeige Spieler die in Fixtures sind, in groupMembers gespeichert sind, oder Matches haben
+      // === STICKY GROUPS: Explizit hinzugefügte Spieler erscheinen IMMER ===
       const eligible = players.filter(p => {
-        if (calculateAgeGroup(p) !== age || p.level !== level) return false;
-
-        // Spieler ist in Fixtures enthalten
+        // PRIORITÄT 1: Spieler ist explizit in dieser Gruppe für diesen Spieltag
+        // Diese erscheinen IMMER, auch wenn Altersgruppe/Level im Profil anders ist!
         if (fixturePlayerIds.has(p.id)) return true;
-
-        // ODER Spieler ist in persistenten Gruppenmitgliedern gespeichert
         if (persistentMemberIds.has(p.id)) return true;
 
-        // ODER Spieler hat irgendwelche Matches in dieser Gruppe (planner oder normal)
+        // Für alle anderen: Altersgruppe muss passen
+        if (calculateAgeGroup(p) !== age) return false;
+
+        // PRÜFUNG: Ist der Spieler explizit einer ANDEREN Gruppe für diesen Tag zugeordnet?
+        // Wenn ja, sollte er hier NICHT erscheinen (auch nicht wegen alter Matches)
+        const otherLevels: Level[] = ['A', 'B', 'C'].filter(l => l !== level) as Level[];
+        const isInOtherGroup = otherLevels.some(otherLevel => {
+          const otherKey = `${roundId}-${age}-${otherLevel}`;
+          const otherMembers = groupMembers[otherKey] || [];
+          return otherMembers.includes(p.id);
+        });
+        if (isInOtherGroup) return false; // Spieler ist in anderer Gruppe für diesen Tag
+
+        // PRIORITÄT 2: Spieler hat Matches in diesem Level für diesen Spieltag
         const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
         if (res) {
-          // Prüfe ob dieser Spieler Matches hat die zu dieser Altersgruppe/Level gehören
-          const hasMatches = res.matches.some(m =>
-            getMatchLevel(m, p.level || null) === level
-          );
-          if (hasMatches) return true;
+          const hasMatchesThisGroup = res.matches.some(m => {
+            const mLevel = m.levelAtMatch || level;
+            const mRoundId = m.roundId || '';
+            const isThisLevel = mLevel === level;
+            const isThisRound = mRoundId === roundId || mRoundId === `planner-${roundId}`;
+            // WICHTIG: Prüfe auch die Altersgruppe, um Cross-Agegroup-Contamination zu verhindern
+            const isThisAgeGroup = m.ageGroupAtMatch ? m.ageGroupAtMatch === age : calculateAgeGroup(p) === age;
+            return isThisLevel && isThisRound && isThisAgeGroup;
+          });
+          if (hasMatchesThisGroup) return true;
         }
 
+        // Kein Fallback mehr - nur explizit hinzugefügte Spieler anzeigen
         return false;
       });
 
@@ -2174,31 +2209,21 @@ const TennisManager = () => {
       const participantCount = eligible.length;
 
       // Für die Gewichtungsberechnung verwenden wir nur die Spieler, die aktuell in Fixtures sind
-      // (nicht die mit alten Matches, die keine Fixtures mehr haben)
       const fixtureParticipantCount = fixturePlayerIds.size > 0 ? fixturePlayerIds.size : participantCount;
       const weight = getGroupSizeWeight(fixtureParticipantCount, age, level);
+
       const stats = eligible.map(p => {
         const res = results.find(r => r.playerId === p.id && (!tournamentId || r.tournamentId === tournamentId));
-        // Sammle ALLE Matches (planner und normale) für dieses Level
-        let matches = res ? res.matches.filter(m =>
-          getMatchLevel(m, p.level || null) === level
-        ) : [];
 
-        // Filtere nach roundId wenn angegeben
-        // Hinweis: roundId kann eine normale Round-ID sein oder eine planner-ID
-        if (roundId) {
-          matches = matches.filter(m => {
-            // Match hat die exakt angegebene roundId
-            if (m.roundId === roundId) return true;
-            // Match ist ein planner-Match für diese Runde
-            if (m.roundId === `planner-${roundId}`) return true;
-            // Match wurde für den gleichen Spieltag erfasst (normale Eingabe)
-            return false;
-          });
-        }
+        // === NUR AKTUELLER SPIELTAG: Punkte werden pro Tag gezählt, NICHT kumulativ ===
+        let matches = res ? res.matches.filter(m => {
+          const mRoundId = m.roundId || '';
+          // Nur Matches von DIESEM Spieltag zählen
+          return mRoundId === roundId || mRoundId === `planner-${roundId}`;
+        }) : [];
 
         let wins = 0, close = 0, losses = 0;
-        // Teilnahme pro Turniertag: wir zählen jedes RoundId einmal, wenn ein Match dort vorliegt
+        // Teilnahme pro Turniertag: wir zählen jedes RoundId einmal
         const roundIds = new Set<string>();
         matches.forEach(m => {
           if (m.isWin) wins++;
@@ -2305,17 +2330,33 @@ const TennisManager = () => {
   const generatePlannerForAgeGroup = (age: AgeGroup) => {
     if (!checkPermission('canManagePlanner', 'Spielplan generieren')) return;
     const newMap = { ...plannerFixtures };
+    const updatedGroupMembers = { ...groupMembers };
+
     (['A', 'B', 'C'] as Level[]).forEach(level => {
       // Berücksichtige ausgeschlossene Spieler
       const excludedIds = plannerSelectedRoundId
         ? getExcludedPlayerIds(plannerSelectedRoundId, age, level)
         : [];
 
-      const eligible = players.filter(p =>
-        calculateAgeGroup(p) === age &&
-        p.level === level &&
-        !excludedIds.includes(p.id) // Ausgeschlossene Spieler nicht berücksichtigen
-      );
+      // === STICKY GROUPS: Prüfe ob bereits Spieler für diesen Spieltag gespeichert sind ===
+      const memberKey = `${plannerSelectedRoundId}-${age}-${level}`;
+      const existingMemberIds = groupMembers[memberKey] || [];
+
+      let eligible: Player[];
+      if (existingMemberIds.length > 0) {
+        // PRIORITÄT 1: Verwende gespeicherte Gruppe (auch wenn Profil-Level geändert wurde)
+        eligible = players.filter(p =>
+          existingMemberIds.includes(p.id) &&
+          !excludedIds.includes(p.id)
+        );
+      } else {
+        // PRIORITÄT 2: Standard - nutze Spieler mit passendem Profil-Level
+        eligible = players.filter(p =>
+          calculateAgeGroup(p) === age &&
+          p.level === level &&
+          !excludedIds.includes(p.id)
+        );
+      }
 
       const groupKey = `${age}-${level}`;
       const currentMode = groupMatchModes[groupKey] || 'auto';
@@ -2331,8 +2372,13 @@ const TennisManager = () => {
         p2Id: f.p2Id
       }));
       newMap[getPlannerKey(age, level, plannerSelectedRoundId)] = fixtures;
+
+      // === PERSISTENCE: Speichere die Spieler in groupMembers für diesen Spieltag ===
+      updatedGroupMembers[memberKey] = eligible.map(p => p.id);
     });
+
     updatePlannerFixtures(newMap);
+    updateGroupMembers(updatedGroupMembers);
     addToast(`Auslosung für ${displayAgeGroup(age)} aktualisiert`, 'success');
   };
 
@@ -2345,13 +2391,13 @@ const TennisManager = () => {
     if (!p1 || !p2) return;
 
     const tournamentId = plannerSelectedTournamentId;
-    const roundId = `planner-${plannerSelectedRoundId}`;
 
     // --- ATOMIC DELETE (Race Condition Fix) ---
     // Lösche Matches für beide Spieler atomar (parallel)
+    // WICHTIG: Verwende fixture.id (fixtureId) zur eindeutigen Identifikation!
     const [success1, success2] = await Promise.all([
-      apiDeleteMatchAtomic(p1.id, tournamentId, roundId, p2.id),
-      apiDeleteMatchAtomic(p2.id, tournamentId, roundId, p1.id)
+      apiDeleteMatchAtomic(p1.id, tournamentId, fixture.id),
+      apiDeleteMatchAtomic(p2.id, tournamentId, fixture.id)
     ]);
 
     if (!success1 || !success2) {
@@ -2359,16 +2405,14 @@ const TennisManager = () => {
       return;
     }
 
-    // Aktualisiere lokalen State
+    // Aktualisiere lokalen State - NUR das Match mit dieser fixtureId löschen!
     let updatedResults = [...results];
     [p1.id, p2.id].forEach(playerId => {
       const idx = updatedResults.findIndex(r => r.playerId === playerId && r.tournamentId === tournamentId);
       if (idx >= 0) {
         updatedResults[idx] = {
           ...updatedResults[idx],
-          matches: updatedResults[idx].matches.filter(m =>
-            !(m.roundId === roundId && (m.opponentId === p1.id || m.opponentId === p2.id))
-          )
+          matches: updatedResults[idx].matches.filter(m => m.fixtureId !== fixture.id)
         };
       }
     });
@@ -2432,6 +2476,7 @@ const TennisManager = () => {
       timestamp: Date.now(),
       scoringMode: mode,
       levelAtMatch: fixture.level,
+      ageGroupAtMatch: fixture.ageGroup, // Track which age group this match belongs to
       fixtureId: fixture.id // Unique fixture identifier
     };
 
@@ -2446,6 +2491,7 @@ const TennisManager = () => {
       timestamp: Date.now(),
       scoringMode: mode,
       levelAtMatch: fixture.level,
+      ageGroupAtMatch: fixture.ageGroup, // Track which age group this match belongs to
       fixtureId: fixture.id // Unique fixture identifier
     };
 
@@ -2548,28 +2594,13 @@ const TennisManager = () => {
       return;
     }
 
-    // Wenn das Level sich ändert, aktualisiere das Level des Spielers UND seiner Matches
+    // Wenn das Level sich ändert, aktualisiere NUR das Profil-Level des Spielers
+    // Die historischen Matches behalten ihr levelAtMatch!
     if (selectedPlayer.level !== plannerNewLevel) {
-      // Aktualisiere Spieler-Level
       const updatedPlayers = players.map(p =>
         p.id === selectedPlayer.id ? { ...p, level: plannerNewLevel } : p
       );
       updatePlayers(updatedPlayers);
-
-      // Aktualisiere levelAtMatch in allen Matches dieses Spielers
-      const updatedResults = results.map(r => {
-        if (r.playerId === selectedPlayer.id) {
-          return {
-            ...r,
-            matches: r.matches.map(m => ({
-              ...m,
-              levelAtMatch: plannerNewLevel
-            }))
-          };
-        }
-        return r;
-      });
-      updateResults(updatedResults);
     }
 
     // Spieler wird zur Planung hinzugefügt (in der Ziel-Altersgruppe/Level)
@@ -2583,6 +2614,17 @@ const TennisManager = () => {
       p1Id: selectedPlayer.id,
       p2Id: ''
     };
+
+    // Füge Spieler auch zu groupMembers hinzu für diesen Spieltag/Level
+    const memberKey = `${plannerSelectedRoundId}-${plannerTargetAgeGroup}-${plannerNewLevel}`;
+    const currentMembers = groupMembers[memberKey] || [];
+    if (!currentMembers.includes(selectedPlayer.id)) {
+      updateGroupMembers({
+        ...groupMembers,
+        [memberKey]: [...currentMembers, selectedPlayer.id]
+      });
+    }
+
     // WICHTIG: updatePlannerFixtures verwenden statt setPlannerFixtures, damit die DB aktualisiert wird!
     updatePlannerFixtures({
       ...plannerFixtures,
@@ -2590,7 +2632,7 @@ const TennisManager = () => {
     });
     setPlannerSelectedPlayerId('');
     setPlannerNewLevel('C');
-    addToast(`${selectedPlayer.name} zu ${displayAgeGroup(plannerTargetAgeGroup)}, ${LEVEL_LABELS[plannerNewLevel]} hinzugefügt${selectedPlayer.level !== plannerNewLevel ? ' (Level & Punkte übertragen)' : ''}`, 'success');
+    addToast(`${selectedPlayer.name} zu ${displayAgeGroup(plannerTargetAgeGroup)}, ${LEVEL_LABELS[plannerNewLevel]} hinzugefügt`, 'success');
   };
 
 
@@ -2963,8 +3005,9 @@ const TennisManager = () => {
     currentBracket.groups.forEach(g => {
       g.matches.forEach(m => {
         if (m.p1 && m.p2) {
-          deletePromises.push(apiDeleteMatchAtomic(m.p1.id, currentBracket.tournamentId || '', `bracket-${m.id}`, m.p2.id));
-          deletePromises.push(apiDeleteMatchAtomic(m.p2.id, currentBracket.tournamentId || '', `bracket-${m.id}`, m.p1.id));
+          // Verwende m.id als fixtureId für eindeutige Identifikation
+          deletePromises.push(apiDeleteMatchAtomic(m.p1.id, currentBracket.tournamentId || '', m.id));
+          deletePromises.push(apiDeleteMatchAtomic(m.p2.id, currentBracket.tournamentId || '', m.id));
         }
       });
     });
@@ -3339,6 +3382,9 @@ const TennisManager = () => {
         if (mode === 'race4') {
           // Race-4: Keine knappe Niederlage
           isCloseLoss = false;
+        } else if (mode === 'race7') {
+          // Race-7: Knapp bei 5:7 oder 6:7 (Verlierer mindestens 5)
+          isCloseLoss = (p2 >= 7 && p1 >= 5 && diff <= 2);
         } else if (mode === 'race10') {
           // Race-10: Knapp bei 10:8, 10:9 etc. (Verlierer mindestens 8)
           isCloseLoss = (p2 >= 10 && p1 >= 8 && diff <= 2);
@@ -4399,30 +4445,31 @@ const TennisManager = () => {
 
 
 
-        const countParticipants = (roundScope: 'all' | string | null, level: Level | null) => {
+        const countParticipants = (roundScope: 'all' | string | null, level: Level | null, ageGroupOverride?: AgeGroup) => {
+          // Verwende ageGroupOverride oder den berechneten ageGroup
+          const targetAgeGroup = ageGroupOverride || ageGroup;
 
+          // PRIORITÄT 1: Nutze groupMembers für genaue Teilnehmerzahl des Spieltags
+          if (roundScope && roundScope !== 'all' && level) {
+            const memberKey = `${roundScope}-${targetAgeGroup}-${level}`;
+            const members = groupMembers[memberKey];
+            if (members && members.length > 0) {
+              return members.length;
+            }
+          }
+
+          // FALLBACK: Zähle Spieler mit Matches (für alte Daten ohne groupMembers)
           return players.filter(p => {
-
-            if (calculateAgeGroup(p) !== ageGroup) return false;
-
+            if (calculateAgeGroup(p) !== targetAgeGroup) return false;
             const r = results.find(rr => rr.playerId === p.id && rr.tournamentId === tourn.id);
-
             if (!r) return false;
-
             return r.matches.some(m => {
-
               const matchesRoundScope = roundScope ? (m.roundId === roundScope || m.roundId === `planner-${roundScope}`) : false;
-
               const inScope = roundScope === 'all' ? true : roundScope === null ? !m.roundId : matchesRoundScope;
-
               const matchLevel = getMatchLevel(m, p.level || null);
-
               return inScope && (level ? matchLevel === level : true);
-
             });
-
           }).length;
-
         };
 
 
@@ -4559,26 +4606,15 @@ const TennisManager = () => {
             return; // Keine Matches im Scope -> weiter zum nächsten Turnier
           }
 
-          const requiresWinForScope = rankingScope !== 'overall';
-          const hasRelevantWin = rankingRoundScope === 'all'
-            ? matchesInScope.some(m => m.isWin)
-            : matchesInScope.some(m => m.isWin && (m.roundId === rankingRoundScope || m.roundId === `planner-${rankingRoundScope}`));
-
-          if (requiresWinForScope && !hasRelevantWin) {
-            return; // Nur Spieler mit Siegen für diese Auswahl anzeigen
-          }
-
+          // Spieler mit Matches (Siege, knappe Niederlagen oder Niederlagen) werden angezeigt
           hasPlayedInScope = true;
 
+          // WICHTIG: Verwende das Level für diesen Spieltag aus groupMembers, nicht aus alten Matches
+          const levelInScope = (rankingRoundScope && rankingRoundScope !== 'all')
+            ? getPlayerLevelForRound(player.id, rankingRoundScope, ageGroup) || getMatchLevel(matchesInScope[0], player.level || null)
+            : getMatchLevel(matchesInScope[0], player.level || null);
 
-
-          const levelInScope = getMatchLevel(matchesInScope[0], player.level || null);
-
-          const participantCount = countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelInScope);
-
-
-
-          const groupWeight = getGroupSizeWeight(participantCount, ageGroup, levelInScope || undefined);
+          // groupWeight/participantCount werden später pro Match mit ageGroupAtMatch berechnet
 
           let matchPoints = 0;
 
@@ -4593,8 +4629,9 @@ const TennisManager = () => {
             const base = m.isWin ? 2 : m.isCloseLoss ? 1 : 0;
 
             const levelForMatch = getMatchLevel(m, levelInScope);
-
-            const weight = getGroupSizeWeight(countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelForMatch), ageGroup, levelForMatch || undefined);
+            // WICHTIG: Verwende die Altersgruppe aus dem Match, nicht vom Spieler-Profil
+            const ageGroupForMatch = m.ageGroupAtMatch || ageGroup;
+            const weight = getGroupSizeWeight(countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, levelForMatch, ageGroupForMatch), ageGroupForMatch, levelForMatch || undefined);
 
             matchPoints += base * weight;
 
@@ -4612,6 +4649,13 @@ const TennisManager = () => {
 
           totalPoints += turnierScore;
 
+          // Berechne die tatsächlich verwendete Gewichtung für die Anzeige
+          // Verwende die Altersgruppe des ersten Matches (repräsentativ)
+          const firstMatch = matchesInScope[0];
+          const displayAgeGroup = firstMatch?.ageGroupAtMatch || ageGroup;
+          const displayLevel = getMatchLevel(firstMatch, levelInScope);
+          const displayParticipantCount = countParticipants(rankingRoundScope === 'all' ? 'all' : rankingRoundScope, displayLevel, displayAgeGroup);
+          const displayWeight = getGroupSizeWeight(displayParticipantCount, displayAgeGroup, displayLevel || undefined);
 
           details.push({
 
@@ -4621,13 +4665,13 @@ const TennisManager = () => {
 
             weighted: turnierScore.toFixed(1),
 
-            stats: `${wins} S (x${groupWeight.toFixed(2)}) / ${closeLosses} KN (x${groupWeight.toFixed(2)})`,
+            stats: `${wins} S (x${displayWeight.toFixed(2)}) / ${closeLosses} KN (x${displayWeight.toFixed(2)})`,
 
             participationPoints: participationPoints, // Ungewichtet, pro Spieltag
 
-            participants: participantCount,
+            participants: displayParticipantCount,
 
-            weight: groupWeight.toFixed(2)
+            weight: displayWeight.toFixed(2)
 
           });
 
@@ -4635,7 +4679,21 @@ const TennisManager = () => {
 
       });
 
-
+      // === ZUSÄTZLICHE PRÜFUNG: Ist der Spieler in groupMembers für diesen Spieltag? ===
+      // Spieler in groupMembers erscheinen in der Rangliste, bekommen aber erst Punkte
+      // wenn sie tatsächlich ein Spiel absolviert haben
+      if (rankingScope !== 'overall' && rankingRoundScope && rankingRoundScope !== 'all') {
+        const levels: Level[] = ['A', 'B', 'C'];
+        for (const level of levels) {
+          const memberKey = `${rankingRoundScope}-${ageGroup}-${level}`;
+          const members = groupMembers[memberKey] || [];
+          if (members.includes(player.id)) {
+            hasPlayedInScope = true;
+            // KEIN automatischer Teilnahmepunkt mehr - nur wenn Matches gespielt wurden
+            break;
+          }
+        }
+      }
 
       return {
 
@@ -4672,7 +4730,13 @@ const TennisManager = () => {
     }
 
     if (rankingLevelFilter !== 'All') {
-      data = data.filter(p => p.level === rankingLevelFilter);
+      data = data.filter(p => {
+        // Bei spieltagspezifischer Ansicht: verwende das Level für diesen Tag
+        const playerLevel = (rankingRoundScope && rankingRoundScope !== 'all')
+          ? getPlayerLevelForRound(p.id, rankingRoundScope, p.ageGroup)
+          : p.level;
+        return playerLevel === rankingLevelFilter;
+      });
     }
 
 
@@ -4990,19 +5054,44 @@ const TennisManager = () => {
 
     const startDraw = () => {
       const selectedPlayers = eligiblePlayers.filter(p => selectedPlayerIds.has(p.id));
-      if (selectedPlayers.length < 2) {
-        addToast('Mindestens 2 Spieler benötigt', 'error');
-        return;
-      }
 
       if (activeTab === 'planner') {
-        // NUR Spieler zur Gruppe hinzufügen (keine Fixtures generieren)
-        // Die eigentliche Auslosung erfolgt über den separaten "Auslosen"-Button
-        const memberKey = `${plannerSelectedRoundId}-${plannerAgeGroup}-${level}`;
-        const playerIds = selectedPlayers.map(p => p.id);
-        updateGroupMembers({ ...groupMembers, [memberKey]: playerIds });
+        // Im Planner-Modus: Spieler zur Gruppe HINZUFÜGEN (nicht ersetzen!)
+        if (selectedPlayers.length < 1) {
+          addToast('Mindestens 1 Spieler benötigt', 'error');
+          return;
+        }
 
-        addToast(`${selectedPlayers.length} Spieler zu ${LEVEL_LABELS[level]} hinzugefügt`, 'success');
+        const newPlayerIds = selectedPlayers.map(p => p.id);
+        const targetMemberKey = `${plannerSelectedRoundId}-${plannerAgeGroup}-${level}`;
+
+        // Kopiere groupMembers für Updates
+        const updatedGroupMembers = { ...groupMembers };
+
+        // === AUTO-REMOVE: Entferne Spieler von anderen Leveln am selben Tag ===
+        const allLevels: Level[] = ['A', 'B', 'C'];
+        allLevels.forEach(otherLevel => {
+          if (otherLevel === level) return; // Skip das Ziel-Level
+
+          const otherKey = `${plannerSelectedRoundId}-${plannerAgeGroup}-${otherLevel}`;
+          const otherMembers = updatedGroupMembers[otherKey] || [];
+
+          // Entferne die neuen Spieler von diesem Level
+          const filteredMembers = otherMembers.filter(id => !newPlayerIds.includes(id));
+
+          if (filteredMembers.length !== otherMembers.length) {
+            updatedGroupMembers[otherKey] = filteredMembers;
+          }
+        });
+
+        // Füge die Spieler zum Ziel-Level hinzu
+        const existingMembers = updatedGroupMembers[targetMemberKey] || [];
+        const combinedIds = [...new Set([...existingMembers, ...newPlayerIds])];
+        updatedGroupMembers[targetMemberKey] = combinedIds;
+
+        updateGroupMembers(updatedGroupMembers);
+
+        addToast(`${selectedPlayers.length} Spieler zu ${LEVEL_LABELS[level]} hinzugefügt (aus anderen Leveln entfernt)`, 'success');
       } else if (activeTab === 'bracket') {
         if (bracketType === 'ko') {
           generateBracket(true, selectedPlayers);
@@ -5121,7 +5210,7 @@ const TennisManager = () => {
                       </div>
                     )}
                   </div>
-                  {renderLevelBadge(player.level, 'sm')}
+                  {renderLevelBadge(getPlayerLevelForRound(player.id, plannerSelectedRoundId, plannerAgeGroup), 'sm')}
                 </label>
               ))
             )}
@@ -5141,8 +5230,8 @@ const TennisManager = () => {
               </button>
               <button
                 onClick={startDraw}
-                disabled={selectedPlayerIds.size < 2}
-                className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 ${selectedPlayerIds.size < 2
+                disabled={activeTab === 'planner' ? selectedPlayerIds.size < 1 : selectedPlayerIds.size < 2}
+                className={`flex-1 py-2.5 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 ${(activeTab === 'planner' ? selectedPlayerIds.size < 1 : selectedPlayerIds.size < 2)
                   ? 'opacity-50 cursor-not-allowed bg-slate-400'
                   : 'bg-blue-600 hover:bg-blue-700 text-white'
                   }`}
@@ -6074,7 +6163,12 @@ ${toast.type === 'success' ? 'bg-emerald-600 text-white' : toast.type === 'error
                                 </div>
 
                                 <div className="mt-0.5 md:mt-1">
-                                  {renderLevelBadge(player.level, 'sm')}
+                                  {renderLevelBadge(
+                                    rankingRoundScope && rankingRoundScope !== 'all'
+                                      ? getPlayerLevelForRound(player.id, rankingRoundScope, player.ageGroup)
+                                      : player.level,
+                                    'sm'
+                                  )}
                                 </div>
 
                               </td>
@@ -6797,30 +6891,20 @@ ${toast.type === 'success' ? 'bg-emerald-600 text-white' : toast.type === 'error
                                         allFixturesToDelete.push(...groupFixtures);
                                       });
 
-                                      // ATOMAR LÖSCHEN auf dem Server
-                                      const currentRoundId = `planner-${plannerSelectedRoundId}`;
+                                      // ATOMAR LÖSCHEN auf dem Server - Verwende f.id als eindeutige fixtureId
                                       const deletePromises: Promise<any>[] = [];
                                       allFixturesToDelete.forEach(f => {
-                                        deletePromises.push(apiDeleteMatchAtomic(f.p1Id, plannerSelectedTournamentId, currentRoundId, f.p2Id));
-                                        deletePromises.push(apiDeleteMatchAtomic(f.p2Id, plannerSelectedTournamentId, currentRoundId, f.p1Id));
+                                        deletePromises.push(apiDeleteMatchAtomic(f.p1Id, plannerSelectedTournamentId || '', f.id));
+                                        deletePromises.push(apiDeleteMatchAtomic(f.p2Id, plannerSelectedTournamentId || '', f.id));
                                       });
                                       await Promise.all(deletePromises);
 
-                                      // Lokalen results state bereinigen
+                                      // Lokalen results state bereinigen - Lösche NUR Matches mit diesen fixtureIds
+                                      const fixtureIdsToDelete = new Set(allFixturesToDelete.map(f => f.id));
                                       const updatedResults = results.map(playerResult => {
-                                        const player = players.find(p => p.id === playerResult.playerId);
-                                        if (!player) return playerResult;
-                                        const pAge = calculateAgeGroup(player);
-                                        if (pAge !== plannerAgeGroup) return playerResult;
-
                                         return {
                                           ...playerResult,
-                                          matches: playerResult.matches.filter(m => {
-                                            const mLevel = getMatchLevel(m, player.level || null);
-                                            const isThisLevel = levels.includes(mLevel as Level);
-                                            const isThisRound = m.roundId === currentRoundId;
-                                            return !(isThisLevel && isThisRound);
-                                          })
+                                          matches: playerResult.matches.filter(m => !m.fixtureId || !fixtureIdsToDelete.has(m.fixtureId))
                                         };
                                       });
 
@@ -7522,6 +7606,7 @@ ${toast.type === 'success' ? 'bg-emerald-600 text-white' : toast.type === 'error
                                         <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                                           <select value={plannerScoringMode} onChange={e => setPlannerScoringMode(e.target.value as ScoringMode)} className={`flex-1 text-xs p-1.5 md:p-2 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
                                             <option value="race4">Zählweise: bis 4</option>
+                                            <option value="race7">Zählweise: bis 7</option>
                                             <option value="race10">Zählweise: bis 10</option>
                                             <option value="race15">Zählweise: bis 15</option>
                                             <option value="sets">Zählweise: Sätze</option>
@@ -8134,6 +8219,7 @@ ${toast.type === 'success' ? 'bg-emerald-600 text-white' : toast.type === 'error
 
                       <select value={scoringMode} onChange={e => setScoringMode(e.target.value as ScoringMode)} className={`flex-1 min-w-[140px] text-xs md:text-sm p-2 md:p-2.5 border rounded transition-colors ${darkMode ? 'bg-slate-700 text-slate-100 border-slate-600' : 'bg-white text-slate-900 border-slate-300'}`}>
                         <option value="race4">Zählweise: bis 4</option>
+                        <option value="race7">Zählweise: bis 7</option>
                         <option value="race10">Zählweise: bis 10</option>
                         <option value="race15">Zählweise: bis 15</option>
                         <option value="sets">Zählweise: Sätze</option>
